@@ -9,6 +9,12 @@
 
   let currentView = null;
 
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
   function navigate(view, params) {
     currentView = view;
     renderHeader();
@@ -297,26 +303,85 @@
       return;
     }
 
-    // Topic breakdown
-    const topicRows = TOPICS.map((topic) => {
-      const words = VOCAB[topic.id] || [];
-      const tStats = SRS.topicStats(progress, topic.id, words);
-      const pt = progress.perTopic[topic.id];
-      const accuracy = pt && pt.correct + pt.wrong > 0
-        ? Math.round((pt.correct / (pt.correct + pt.wrong)) * 100)
-        : 0;
-      return `
-        <div class="topic-progress-row">
-          <div>
-            <strong>${topic.icon} ${topic.title[lang]}</strong>
-            <div class="accuracy">${tStats.mastered}/${tStats.total} · ${t('result.accuracy')} ${accuracy}%</div>
-          </div>
-          <div class="progress-bar"><span style="width:${tStats.masteryPct}%"></span></div>
-          <div class="accuracy" style="text-align:right;">${tStats.masteryPct}%</div>
-          <button class="btn secondary" data-topic="${topic.id}">→</button>
-        </div>
+    // Topic breakdown — only topics that have been played, as a data table.
+    const playedTopics = TOPICS
+      .map((topic) => {
+        const pt = progress.perTopic[topic.id];
+        if (!pt || pt.attempts === 0) return null;
+        const words = VOCAB[topic.id] || [];
+        const tStats = SRS.topicStats(progress, topic.id, words);
+        const accuracy = pt.correct + pt.wrong > 0
+          ? Math.round((pt.correct / (pt.correct + pt.wrong)) * 100)
+          : 0;
+        const lastPlayedDays = pt.lastPlayedAt
+          ? Math.max(0, Math.floor((Date.now() - pt.lastPlayedAt) / 86400000))
+          : null;
+        return { topic, words, tStats, pt, accuracy, lastPlayedDays };
+      })
+      .filter(Boolean);
+
+    const topicTable = playedTopics.length === 0
+      ? `<div class="empty-state" style="padding:20px;">${t('progress.noTopicsPlayed')}</div>`
+      : `
+        <table class="progress-table">
+          <thead>
+            <tr>
+              <th>${t('progress.topicCol')}</th>
+              <th>${t('progress.masteryCol')}</th>
+              <th class="num">${t('progress.accuracyCol')}</th>
+              <th class="num">${t('progress.attempts')}</th>
+              <th class="num">${t('progress.lastPlayed')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${playedTopics.map(({ topic, tStats, pt, accuracy, lastPlayedDays }) => `
+              <tr class="clickable" data-topic="${topic.id}">
+                <td>${topic.icon} ${escapeHtml(topic.title[lang])}</td>
+                <td>
+                  <span class="mini-bar"><span style="width:${tStats.masteryPct}%"></span></span>
+                  <span class="muted">${tStats.mastered}/${tStats.total}</span>
+                </td>
+                <td class="num">${accuracy}%</td>
+                <td class="num">${pt.attempts}</td>
+                <td class="num muted">${lastPlayedDays === 0 ? (lang === 'vi' ? 'hôm nay' : 'today') : lastPlayedDays + 'd'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       `;
-    }).join('');
+
+    // Words to review: words with box <= 2 or wrong > 0, sorted by struggle score.
+    const reviewCandidates = [];
+    Object.entries(progress.perWord || {}).forEach(([key, state]) => {
+      const sepIdx = key.indexOf('::');
+      const topicId = key.slice(0, sepIdx);
+      const en = key.slice(sepIdx + 2);
+      const topicDef = TOPICS.find((x) => x.id === topicId);
+      const word = (VOCAB[topicId] || []).find((w) => w.en.toLowerCase() === en);
+      if (!word || !topicDef) return;
+      const struggleScore = state.wrong * 3 + (6 - state.box);
+      if (state.box <= 2 || state.wrong > 0) {
+        reviewCandidates.push({ word, state, topicId, topicDef, struggleScore });
+      }
+    });
+    reviewCandidates.sort((a, b) => b.struggleScore - a.struggleScore);
+    const reviewTop = reviewCandidates.slice(0, 12);
+    const reviewHtml = reviewTop.length === 0
+      ? `<div class="empty-state" style="padding:20px;">${t('progress.noWordsToReview')}</div>`
+      : `<div class="review-list">
+          ${reviewTop.map(({ word, state, topicDef }) => `
+            <div class="review-item box-${state.box}">
+              <div>
+                <div class="w-en">${escapeHtml(word.en)}</div>
+                <div class="w-vi">${escapeHtml(word.vi)}</div>
+              </div>
+              <div class="w-meta">
+                ${topicDef.icon}<br/>
+                ✗ ${state.wrong} · ▣ ${state.box}/5
+              </div>
+            </div>
+          `).join('')}
+        </div>`;
 
     // History: last 30 days
     const today = new Date();
@@ -371,7 +436,10 @@
         </div>
 
         <h2 class="section-title">${t('progress.byTopic')}</h2>
-        <div>${topicRows}</div>
+        ${topicTable}
+
+        <h2 class="section-title">${t('progress.toReview')}</h2>
+        ${reviewHtml}
 
         <h2 class="section-title">${t('progress.history')}</h2>
         <div class="history-chart">${bars.join('')}</div>
@@ -389,8 +457,8 @@
       </section>
     `;
 
-    appEl.querySelectorAll('.topic-progress-row button[data-topic]').forEach((b) => {
-      b.addEventListener('click', () => navigate('topic', { topicId: b.getAttribute('data-topic') }));
+    appEl.querySelectorAll('.progress-table tr.clickable[data-topic]').forEach((r) => {
+      r.addEventListener('click', () => navigate('topic', { topicId: r.getAttribute('data-topic') }));
     });
 
     appEl.querySelector('#exportBtn').addEventListener('click', () => {

@@ -75,6 +75,14 @@
       'progress.empty': 'Chưa có dữ liệu. Hãy bắt đầu chơi một chủ đề!',
       'progress.days': 'ngày',
       'progress.reviewWrong': 'Ôn từ sai',
+      'progress.noTopicsPlayed': 'Chưa có chủ đề nào được chơi. Hãy mở tab Chủ đề để bắt đầu.',
+      'progress.toReview': 'Từ cần ôn',
+      'progress.noWordsToReview': 'Tất cả từ đều ổn! 🎉 Hãy khám phá thêm chủ đề mới.',
+      'progress.attempts': 'Lượt chơi',
+      'progress.lastPlayed': 'Lần cuối',
+      'progress.topicCol': 'Chủ đề',
+      'progress.masteryCol': 'Thạo',
+      'progress.accuracyCol': 'Đúng',
 
       'grammar.soon': 'Phần ngữ pháp đang được xây dựng. Hẹn gặp lại!',
 
@@ -162,6 +170,14 @@
       'progress.empty': 'No data yet. Start a topic to begin!',
       'progress.days': 'days',
       'progress.reviewWrong': 'Review mistakes',
+      'progress.noTopicsPlayed': 'No topic played yet. Open Topics to start.',
+      'progress.toReview': 'Words to review',
+      'progress.noWordsToReview': 'All words look solid! 🎉 Explore new topics.',
+      'progress.attempts': 'Sessions',
+      'progress.lastPlayed': 'Last played',
+      'progress.topicCol': 'Topic',
+      'progress.masteryCol': 'Mastered',
+      'progress.accuracyCol': 'Accuracy',
 
       'grammar.soon': 'Grammar lessons coming soon. Stay tuned!',
 
