@@ -560,32 +560,32 @@ input[type="text"]:focus { border-color: var(--primary); }
   display: flex;
   gap: 8px;
 }
-.typing-feedback {
+.answer-feedback {
   margin-top: 14px;
   min-height: 22px;
 }
-.typing-feedback:empty { min-height: 0; }
-.typing-feedback.ok, .typing-feedback.bad {
+.answer-feedback:empty { min-height: 0; }
+.answer-feedback.ok, .answer-feedback.bad {
   padding: 14px 16px;
   border-radius: var(--radius);
   background: var(--bg-soft);
   border: 1px solid var(--border);
 }
-.typing-feedback.ok { border-color: rgba(34, 197, 94, 0.5); }
-.typing-feedback.bad { border-color: rgba(239, 68, 68, 0.5); }
+.answer-feedback.ok { border-color: rgba(34, 197, 94, 0.5); }
+.answer-feedback.bad { border-color: rgba(239, 68, 68, 0.5); }
 
-.typing-feedback .fb-big-icon {
+.answer-feedback .fb-big-icon {
   width: 56px; height: 56px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 32px; font-weight: 900; margin: 0 auto 10px;
   animation: pop 0.3s ease-out;
 }
-.typing-feedback .fb-big-icon.ok {
+.answer-feedback .fb-big-icon.ok {
   background: rgba(34, 197, 94, 0.15);
   color: var(--success);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
 }
-.typing-feedback .fb-big-icon.bad {
+.answer-feedback .fb-big-icon.bad {
   background: rgba(239, 68, 68, 0.15);
   color: var(--danger);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
@@ -595,53 +595,53 @@ input[type="text"]:focus { border-color: var(--primary); }
   60% { transform: scale(1.15); opacity: 1; }
   100% { transform: scale(1); }
 }
-.typing-feedback .fb-status { font-weight: 700; font-size: 15px; margin-bottom: 8px; text-align: center; }
-.typing-feedback .fb-word {
+.answer-feedback .fb-status { font-weight: 700; font-size: 15px; margin-bottom: 8px; text-align: center; }
+.answer-feedback .fb-word {
   justify-content: center;
 }
-.typing-feedback .fb-meaning {
+.answer-feedback .fb-meaning {
   color: var(--text-muted); font-size: 14px;
   text-align: center; margin-bottom: 10px;
 }
-.typing-feedback .fb-meaning em { color: var(--accent); font-style: normal; font-weight: 600; }
-.typing-feedback .fb-status.ok { color: var(--success); }
-.typing-feedback .fb-status.bad { color: var(--danger); }
-.typing-feedback .fb-word {
+.answer-feedback .fb-meaning em { color: var(--accent); font-style: normal; font-weight: 600; }
+.answer-feedback .fb-status.ok { color: var(--success); }
+.answer-feedback .fb-status.bad { color: var(--danger); }
+.answer-feedback .fb-word {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 20px; margin-bottom: 8px;
 }
-.typing-feedback .fb-word .ipa {
+.answer-feedback .fb-word .ipa {
   font-family: "Charis SIL", "Doulos SIL", Georgia, serif;
   color: var(--text-muted); font-size: 14px; font-weight: 400;
 }
-.typing-feedback .fb-example {
+.answer-feedback .fb-example {
   color: var(--text); font-style: italic; margin-bottom: 8px;
   padding: 8px 10px; background: rgba(255,255,255,0.02);
   border-left: 3px solid var(--primary); border-radius: 4px;
 }
-.typing-feedback .fb-row {
+.answer-feedback .fb-row {
   display: flex; gap: 10px; align-items: flex-start;
   margin-top: 6px; font-size: 13px;
 }
-.typing-feedback .fb-label {
+.answer-feedback .fb-label {
   color: var(--text-muted); font-size: 11px;
   text-transform: uppercase; letter-spacing: 0.5px;
   min-width: 72px; padding-top: 4px;
 }
-.typing-feedback .syn-list, .typing-feedback .ant-list {
+.answer-feedback .syn-list, .answer-feedback .ant-list {
   display: flex; flex-wrap: wrap; gap: 4px;
 }
-.typing-feedback .syn-list span,
-.typing-feedback .ant-list span {
+.answer-feedback .syn-list span,
+.answer-feedback .ant-list span {
   background: var(--bg-card); padding: 2px 8px;
   border-radius: 999px; font-size: 12px;
 }
-.typing-feedback .syn-list span { border: 1px solid rgba(34, 197, 94, 0.4); }
-.typing-feedback .ant-list span { border: 1px solid rgba(239, 68, 68, 0.4); }
-.typing-feedback .fb-actions {
+.answer-feedback .syn-list span { border: 1px solid rgba(34, 197, 94, 0.4); }
+.answer-feedback .ant-list span { border: 1px solid rgba(239, 68, 68, 0.4); }
+.answer-feedback .fb-actions {
   margin-top: 14px; display: flex; justify-content: flex-end;
 }
-.typing-feedback .fb-actions-row {
+.answer-feedback .fb-actions-row {
   margin: 10px 0 14px; display: flex; justify-content: center;
 }
 .btn.listen-again {

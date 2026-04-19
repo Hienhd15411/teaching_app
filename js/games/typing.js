@@ -45,7 +45,7 @@
             <input type="text" id="typingInput" placeholder="${t('game.typingPlaceholder')}" autocomplete="off" autocorrect="off" spellcheck="false" />
             <button class="btn" id="submitBtn">${t('game.submit')}</button>
           </div>
-          <div class="typing-feedback" id="feedback"></div>
+          <div class="answer-feedback" id="feedback"></div>
         </section>
       `;
 
@@ -95,8 +95,8 @@
         ? '<div class="fb-big-icon ok">✓</div>'
         : '<div class="fb-big-icon bad">✗</div>';
       const header = isCorrect
-        ? `<div class="fb-status ok">${I18N.t('game.typingCorrect')}</div>`
-        : `<div class="fb-status bad">${I18N.t('game.typingWrong')}</div>`;
+        ? `<div class="fb-status ok">${I18N.t('game.answerCorrect')}</div>`
+        : `<div class="fb-status bad">${I18N.t('game.answerWrong')}</div>`;
       const wordBlock = `
         <div class="fb-word">
           <strong>${escapeHtml(w.en)}</strong> ${ipaStr}
@@ -113,7 +113,7 @@
         : '';
       const nextBtn = `<button class="btn" id="nextBtn">${I18N.t('game.next')} →</button>`;
 
-      feedback.className = 'typing-feedback ' + (isCorrect ? 'ok' : 'bad');
+      feedback.className = 'answer-feedback ' + (isCorrect ? 'ok' : 'bad');
       feedback.innerHTML = bigIcon + header + wordBlock
         + `<div class="fb-actions-row">${listenBtn}</div>`
         + exampleBlock + synBlock + antBlock
@@ -126,7 +126,9 @@
 
       const nextEl = feedback.querySelector('#nextBtn');
       let armed = false;
+      let armTimer = null;
       const advance = () => {
+        if (armTimer) { clearTimeout(armTimer); armTimer = null; }
         document.removeEventListener('keydown', onKey);
         idx += 1;
         render();
@@ -136,9 +138,15 @@
         if (e.key === 'Enter') { e.preventDefault(); advance(); }
       };
       nextEl.addEventListener('click', advance);
-      // Arm on next tick so the Enter press that triggered check()
-      // doesn't bubble and auto-advance immediately.
-      setTimeout(() => { armed = true; document.addEventListener('keydown', onKey); }, 250);
+      // Arm on next tick so the Enter press that triggered check() doesn't
+      // bubble and auto-advance. Cancel the timer if user clicks Next first,
+      // otherwise the listener would attach AFTER we've moved on and fire
+      // on the next question's Enter press.
+      armTimer = setTimeout(() => {
+        armed = true;
+        armTimer = null;
+        document.addEventListener('keydown', onKey);
+      }, 250);
       nextEl.focus();
     }
 

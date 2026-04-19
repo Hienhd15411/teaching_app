@@ -65,7 +65,7 @@
             <div class="sub">${sub}</div>
           </div>
           <div class="quiz-options">${optHtml}</div>
-          <div class="typing-feedback" id="quizFeedback"></div>
+          <div class="answer-feedback" id="quizFeedback"></div>
         </section>
       `;
       locked = false;
@@ -113,8 +113,8 @@
         ? '<div class="fb-big-icon ok">✓</div>'
         : '<div class="fb-big-icon bad">✗</div>';
       const header = isCorrect
-        ? `<div class="fb-status ok">${I18N.t('game.typingCorrect')}</div>`
-        : `<div class="fb-status bad">${I18N.t('game.typingWrong')}</div>`;
+        ? `<div class="fb-status ok">${I18N.t('game.answerCorrect')}</div>`
+        : `<div class="fb-status bad">${I18N.t('game.answerWrong')}</div>`;
       const wordBlock = `
         <div class="fb-word">
           <strong>${escapeHtml(w.en)}</strong> ${ipaStr}
@@ -130,7 +130,7 @@
         : '';
       const nextBtn = `<button class="btn" id="nextBtn">${I18N.t('game.next')} →</button>`;
 
-      feedback.className = 'typing-feedback ' + (isCorrect ? 'ok' : 'bad');
+      feedback.className = 'answer-feedback ' + (isCorrect ? 'ok' : 'bad');
       feedback.innerHTML = bigIcon + header + wordBlock
         + `<div class="fb-actions-row">${listenBtn}</div>`
         + exampleBlock + synBlock + antBlock
@@ -143,7 +143,9 @@
 
       const nextEl = feedback.querySelector('#nextBtn');
       let armed = false;
+      let armTimer = null;
       const advance = () => {
+        if (armTimer) { clearTimeout(armTimer); armTimer = null; }
         document.removeEventListener('keydown', onKey);
         idx += 1;
         render();
@@ -153,7 +155,11 @@
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); advance(); }
       };
       nextEl.addEventListener('click', advance);
-      setTimeout(() => { armed = true; document.addEventListener('keydown', onKey); }, 250);
+      armTimer = setTimeout(() => {
+        armed = true;
+        armTimer = null;
+        document.addEventListener('keydown', onKey);
+      }, 250);
       nextEl.focus();
     }
 
