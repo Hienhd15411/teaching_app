@@ -1,4 +1,130 @@
 (function () {
   'use strict';
-  // TOEIC Part 3 word data — populated in follow-up commits.
+  if (typeof TOEIC === 'undefined') return;
+
+  // Part 3 · Short Conversations (workplace & customer-service contexts).
+  // Curated from public TOEIC prep materials. Not ETS.
+
+  // ---- 2023 edition ----
+  TOEIC.setPart('2023', 'part3', 'keywords', [
+    { en: 'suggest', vi: 'đề xuất', pos: 'v', ipa: 'səˈdʒest', example: 'She suggests meeting at noon.', syn: ['propose', 'recommend'] },
+    { en: 'imply', vi: 'ngụ ý', pos: 'v', ipa: 'ɪmˈplaɪ', example: 'What does the man imply about the deadline?' },
+    { en: 'complain', vi: 'phàn nàn', pos: 'v', ipa: 'kəmˈpleɪn', example: 'A customer is complaining about the service.' },
+    { en: 'apologize', vi: 'xin lỗi', pos: 'v', ipa: 'əˈpɒlədʒaɪz', example: 'The manager apologised for the delay.' },
+    { en: 'out of stock', vi: 'hết hàng', pos: 'phr', ipa: 'aʊt əv stɒk', example: 'That model is out of stock.' },
+    { en: 'shipment', vi: 'lô hàng', pos: 'n', ipa: 'ˈʃɪpmənt', example: 'The shipment arrives next Monday.' },
+    { en: 'appointment', vi: 'cuộc hẹn', pos: 'n', ipa: 'əˈpɔɪntmənt', example: "I'd like to schedule an appointment." },
+    { en: 'figure out', vi: 'tìm ra cách', pos: 'phr', ipa: 'ˈfɪɡər aʊt', example: "We'll figure out a solution." },
+    { en: 'deal with', vi: 'xử lý', pos: 'phr', ipa: 'diːl wɪð', example: 'He deals with customer complaints.' },
+    { en: 'run out', vi: 'hết (nguyên liệu)', pos: 'phr', ipa: 'rʌn aʊt', example: "We've run out of paper." },
+  ]);
+  TOEIC.setPart('2023', 'part3', 'highFreq', [
+    { en: 'schedule', vi: 'lịch trình', pos: 'n', ipa: 'ˈʃedjuːl', example: 'Check your schedule for Friday.' },
+    { en: 'meeting', vi: 'cuộc họp', pos: 'n', ipa: 'ˈmiːtɪŋ', example: 'The meeting starts at 2 p.m.' },
+    { en: 'project', vi: 'dự án', pos: 'n', ipa: 'ˈprɒdʒekt', example: 'The project is behind schedule.' },
+    { en: 'deadline', vi: 'hạn chót', pos: 'n', ipa: 'ˈdedlaɪn', example: 'The deadline is next Friday.' },
+    { en: 'client', vi: 'khách hàng', pos: 'n', ipa: 'ˈklaɪənt', example: 'The client approved the design.' },
+    { en: 'supplier', vi: 'nhà cung cấp', pos: 'n', ipa: 'səˈplaɪə', example: 'Our supplier raised prices.' },
+    { en: 'delivery', vi: 'giao hàng', pos: 'n', ipa: 'dɪˈlɪvəri', example: 'The delivery is delayed.' },
+    { en: 'receipt', vi: 'hoá đơn', pos: 'n', ipa: 'rɪˈsiːt', example: 'Keep the receipt for the refund.' },
+    { en: 'refund', vi: 'hoàn tiền', pos: 'n', ipa: 'ˈriːfʌnd', example: 'She requested a refund.' },
+    { en: 'warranty', vi: 'bảo hành', pos: 'n', ipa: 'ˈwɒrənti', example: 'The laptop has a two-year warranty.' },
+    { en: 'receipt', vi: 'biên lai', pos: 'n', ipa: 'rɪˈsiːt', example: 'Would you like the receipt emailed?' },
+    { en: 'reschedule', vi: 'đổi lịch', pos: 'v', ipa: 'ˌriːˈʃedjuːl', example: 'We need to reschedule the demo.' },
+    { en: 'confirm', vi: 'xác nhận', pos: 'v', ipa: 'kənˈfɜːm', example: 'Please confirm the booking.' },
+    { en: 'cancel', vi: 'huỷ', pos: 'v', ipa: 'ˈkænsl', example: 'They cancelled the order.' },
+    { en: 'assist', vi: 'hỗ trợ', pos: 'v', ipa: 'əˈsɪst', example: 'How may I assist you?', syn: ['help'] },
+    { en: 'handle', vi: 'xử lý', pos: 'v', ipa: 'ˈhændl', example: 'She handles overseas clients.' },
+    { en: 'contact', vi: 'liên hệ', pos: 'v', ipa: 'ˈkɒntækt', example: "I'll contact the vendor." },
+    { en: 'notify', vi: 'thông báo', pos: 'v', ipa: 'ˈnəʊtɪfaɪ', example: 'Notify the team when it\u2019s done.' },
+    { en: 'arrange', vi: 'sắp xếp', pos: 'v', ipa: 'əˈreɪndʒ', example: "I'll arrange the transportation." },
+    { en: 'available', vi: 'rảnh', pos: 'adj', ipa: 'əˈveɪləbl', example: 'Are you available tomorrow?' },
+    { en: 'urgent', vi: 'gấp', pos: 'adj', ipa: 'ˈɜːdʒənt', example: 'This is an urgent matter.' },
+    { en: 'broken', vi: 'hỏng', pos: 'adj', ipa: 'ˈbrəʊkən', example: 'The printer is broken again.' },
+    { en: 'missing', vi: 'bị thiếu', pos: 'adj', ipa: 'ˈmɪsɪŋ', example: 'Two boxes are missing from the shipment.' },
+    { en: 'in charge of', vi: 'phụ trách', pos: 'phr', ipa: 'ɪn tʃɑːdʒ əv', example: "She's in charge of logistics." },
+    { en: 'set up', vi: 'thiết lập', pos: 'phr', ipa: 'set ʌp', example: 'Can you set up the projector?' },
+  ]);
+
+  // ---- 2024 edition ----
+  TOEIC.setPart('2024', 'part3', 'keywords', [
+    { en: 'refer to', vi: 'ám chỉ, tham chiếu', pos: 'phr', ipa: 'rɪˈfɜː tuː', example: 'What does the woman refer to?' },
+    { en: 'offer', vi: 'đề nghị, cung cấp', pos: 'v', ipa: 'ˈɒfə', example: 'The man offers to help.' },
+    { en: 'accept', vi: 'chấp nhận', pos: 'v', ipa: 'əkˈsept', example: 'She accepted the invitation.' },
+    { en: 'decline', vi: 'từ chối', pos: 'v', ipa: 'dɪˈklaɪn', example: 'He declined the offer politely.' },
+    { en: 'mention', vi: 'nhắc tới', pos: 'v', ipa: 'ˈmenʃn', example: 'She mentioned a new policy.' },
+    { en: 'overhear', vi: 'nghe lỏm', pos: 'v', ipa: 'ˌəʊvəˈhɪə', example: 'I overheard them talking about a promotion.' },
+    { en: 'deal', vi: 'thương vụ, thoả thuận', pos: 'n', ipa: 'diːl', example: 'We closed the deal yesterday.' },
+    { en: 'on the phone', vi: 'đang gọi điện', pos: 'phr', ipa: 'ɒn ðə fəʊn', example: 'He is on the phone with a client.' },
+    { en: 'out of service', vi: 'không hoạt động', pos: 'phr', ipa: 'aʊt əv ˈsɜːvɪs', example: 'The elevator is out of service.' },
+    { en: 'speak with', vi: 'nói chuyện với', pos: 'phr', ipa: 'spiːk wɪð', example: "I'd like to speak with the manager." },
+  ]);
+  TOEIC.setPart('2024', 'part3', 'highFreq', [
+    { en: 'department', vi: 'phòng ban', pos: 'n', ipa: 'dɪˈpɑːtmənt', example: 'She works in the marketing department.' },
+    { en: 'colleague', vi: 'đồng nghiệp', pos: 'n', ipa: 'ˈkɒliːɡ', example: 'His colleague will cover the shift.' },
+    { en: 'supervisor', vi: 'người giám sát', pos: 'n', ipa: 'ˈsuːpəvaɪzə', example: 'Please discuss this with your supervisor.' },
+    { en: 'shift', vi: 'ca làm', pos: 'n', ipa: 'ʃɪft', example: 'I work the afternoon shift.' },
+    { en: 'overtime', vi: 'làm thêm giờ', pos: 'n', ipa: 'ˈəʊvətaɪm', example: 'Are you working overtime tonight?' },
+    { en: 'branch', vi: 'chi nhánh', pos: 'n', ipa: 'brɑːntʃ', example: 'The Chicago branch is expanding.' },
+    { en: 'headquarters', vi: 'trụ sở chính', pos: 'n', ipa: 'hedˈkwɔːtəz', example: 'Our headquarters are in Singapore.' },
+    { en: 'conference', vi: 'hội thảo', pos: 'n', ipa: 'ˈkɒnfərəns', example: "We're attending the trade conference." },
+    { en: 'booth', vi: 'quầy hội chợ', pos: 'n', ipa: 'buːð', example: 'Visit our booth at the expo.' },
+    { en: 'venue', vi: 'địa điểm tổ chức', pos: 'n', ipa: 'ˈvenjuː', example: 'The venue has changed to the ballroom.' },
+    { en: 'order', vi: 'đơn hàng', pos: 'n', ipa: 'ˈɔːdə', example: 'The order will ship tomorrow.' },
+    { en: 'billing', vi: 'lập hoá đơn', pos: 'n', ipa: 'ˈbɪlɪŋ', example: 'Please contact the billing department.' },
+    { en: 'inquiry', vi: 'câu hỏi, thắc mắc', pos: 'n', ipa: 'ɪnˈkwaɪəri', example: "I'd like to make an inquiry.", syn: ['question'] },
+    { en: 'request', vi: 'yêu cầu', pos: 'n', ipa: 'rɪˈkwest', example: 'Your request has been received.' },
+    { en: 'quote', vi: 'báo giá', pos: 'n', ipa: 'kwəʊt', example: 'Could you send me a quote?' },
+    { en: 'discount', vi: 'giảm giá', pos: 'n', ipa: 'ˈdɪskaʊnt', example: 'They offered a 10% discount.' },
+    { en: 'return', vi: 'đổi trả', pos: 'v', ipa: 'rɪˈtɜːn', example: 'Can I return this item?' },
+    { en: 'exchange', vi: 'đổi', pos: 'v', ipa: 'ɪksˈtʃeɪndʒ', example: "I'd like to exchange this for a larger size." },
+    { en: 'repair', vi: 'sửa', pos: 'v', ipa: 'rɪˈpeə', example: 'The printer needs repair.' },
+    { en: 'install', vi: 'cài đặt', pos: 'v', ipa: 'ɪnˈstɔːl', example: 'IT will install the software tomorrow.' },
+    { en: 'track', vi: 'theo dõi', pos: 'v', ipa: 'træk', example: 'Can I track my package online?' },
+    { en: 'ship', vi: 'gửi hàng', pos: 'v', ipa: 'ʃɪp', example: "We'll ship it by courier." },
+    { en: 'inform', vi: 'thông báo', pos: 'v', ipa: 'ɪnˈfɔːm', example: 'Please inform the clients.' },
+    { en: 'complain about', vi: 'phàn nàn về', pos: 'phr', ipa: 'kəmˈpleɪn əˈbaʊt', example: 'A guest is complaining about the noise.' },
+    { en: 'take care of', vi: 'lo liệu', pos: 'phr', ipa: 'teɪk keər əv', example: "I'll take care of it." },
+  ]);
+
+  // ---- 2026 edition ----
+  TOEIC.setPart('2026', 'part3', 'keywords', [
+    { en: 'be likely to', vi: 'có khả năng', pos: 'phr', ipa: 'bi ˈlaɪkli tuː', example: 'The project is likely to be delayed.' },
+    { en: 'be concerned about', vi: 'lo ngại về', pos: 'phr', ipa: 'bi kənˈsɜːnd əˈbaʊt', example: 'She\u2019s concerned about the budget.' },
+    { en: 'agree to', vi: 'đồng ý làm', pos: 'phr', ipa: 'əˈɡriː tuː', example: 'He agreed to review the plan.' },
+    { en: 'most likely', vi: 'nhiều khả năng', pos: 'phr', ipa: 'məʊst ˈlaɪkli', example: 'Where are the speakers most likely working?' },
+    { en: 'stop by', vi: 'ghé qua', pos: 'phr', ipa: 'stɒp baɪ', example: "I'll stop by your office later." },
+    { en: 'check in with', vi: 'cập nhật với', pos: 'phr', ipa: 'tʃek ɪn wɪð', example: "I'll check in with the team at 3." },
+    { en: 'fall through', vi: 'bất thành', pos: 'phr', ipa: 'fɔːl θruː', example: 'The deal fell through.' },
+    { en: 'bring up', vi: 'nêu lên (vấn đề)', pos: 'phr', ipa: 'brɪŋ ʌp', example: 'She brought up an interesting point.' },
+    { en: 'back up', vi: 'ủng hộ, sao lưu', pos: 'phr', ipa: 'bæk ʌp', example: "I'll back you up in the meeting." },
+    { en: 'run into', vi: 'tình cờ gặp', pos: 'phr', ipa: 'rʌn ˈɪntuː', example: "I ran into a former client today." },
+  ]);
+  TOEIC.setPart('2026', 'part3', 'highFreq', [
+    { en: 'vendor', vi: 'nhà cung cấp', pos: 'n', ipa: 'ˈvendə', example: 'We need a new vendor for packaging.' },
+    { en: 'agenda', vi: 'chương trình họp', pos: 'n', ipa: 'əˈdʒendə', example: "Let's stick to the agenda." },
+    { en: 'minutes', vi: 'biên bản họp', pos: 'n', ipa: 'ˈmɪnɪts', example: 'Could you take the minutes?' },
+    { en: 'presentation', vi: 'thuyết trình', pos: 'n', ipa: 'ˌpreznˈteɪʃn', example: 'Her presentation was excellent.' },
+    { en: 'launch', vi: 'ra mắt', pos: 'n', ipa: 'lɔːntʃ', example: 'The launch is scheduled for Q3.' },
+    { en: 'campaign', vi: 'chiến dịch', pos: 'n', ipa: 'kæmˈpeɪn', example: 'The ad campaign starts Monday.' },
+    { en: 'feedback', vi: 'phản hồi', pos: 'n', ipa: 'ˈfiːdbæk', example: 'We received great feedback from clients.' },
+    { en: 'approval', vi: 'phê duyệt', pos: 'n', ipa: 'əˈpruːvl', example: 'We need your approval on this.' },
+    { en: 'paperwork', vi: 'giấy tờ', pos: 'n', ipa: 'ˈpeɪpəwɜːk', example: 'The paperwork is on your desk.' },
+    { en: 'expenses', vi: 'chi phí', pos: 'n', ipa: 'ɪkˈspensɪz', example: 'Submit your travel expenses by Friday.' },
+    { en: 'travel arrangements', vi: 'sắp xếp đi lại', pos: 'n', ipa: 'ˈtrævl əˈreɪndʒmənts', example: 'She\u2019ll handle the travel arrangements.' },
+    { en: 'reservation', vi: 'đặt chỗ', pos: 'n', ipa: 'ˌrezəˈveɪʃn', example: 'I have a reservation under Nguyen.' },
+    { en: 'maintenance', vi: 'bảo trì', pos: 'n', ipa: 'ˈmeɪntənəns', example: 'The elevator is under maintenance.' },
+    { en: 'facility', vi: 'cơ sở vật chất', pos: 'n', ipa: 'fəˈsɪləti', example: 'The new facility opens in May.' },
+    { en: 'renovation', vi: 'cải tạo', pos: 'n', ipa: 'ˌrenəˈveɪʃn', example: 'The lobby is under renovation.' },
+    { en: 'renew', vi: 'gia hạn', pos: 'v', ipa: 'rɪˈnjuː', example: 'Remember to renew your membership.' },
+    { en: 'approve', vi: 'phê duyệt', pos: 'v', ipa: 'əˈpruːv', example: 'The director approved the proposal.' },
+    { en: 'implement', vi: 'triển khai', pos: 'v', ipa: 'ˈɪmplɪment', example: 'We will implement the changes next month.' },
+    { en: 'replace', vi: 'thay thế', pos: 'v', ipa: 'rɪˈpleɪs', example: 'We need to replace the old system.' },
+    { en: 'launch', vi: 'ra mắt (sản phẩm)', pos: 'v', ipa: 'lɔːntʃ', example: 'They launched a new product line.' },
+    { en: 'extend', vi: 'gia hạn, mở rộng', pos: 'v', ipa: 'ɪkˈstend', example: 'Can we extend the deadline?' },
+    { en: 'hire', vi: 'tuyển', pos: 'v', ipa: 'ˈhaɪə', example: 'HR is hiring two new engineers.' },
+    { en: 'promote', vi: 'thăng chức, quảng bá', pos: 'v', ipa: 'prəˈməʊt', example: 'She was promoted to manager.' },
+    { en: 'reduce', vi: 'giảm', pos: 'v', ipa: 'rɪˈdjuːs', example: "We're reducing operating costs." },
+    { en: 'expand', vi: 'mở rộng', pos: 'v', ipa: 'ɪkˈspænd', example: 'The company plans to expand overseas.' },
+  ]);
 })();
