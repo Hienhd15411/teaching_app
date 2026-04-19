@@ -72,18 +72,24 @@
       SRS.updateWord(progress, topicId, w.en, isCorrect);
       Storage.saveProgress(progress);
 
+      const ipaStr = w.ipa ? ` <span style="font-family:Georgia,serif;color:var(--text-muted);">${escapeHtml(w.ipa)}</span>` : '';
+      const speakBtn = ` <button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>`;
       if (isCorrect) {
         correct += 1;
         combo += 1;
         if (combo > bestCombo) bestCombo = combo;
         xp += 10 + (combo >= 3 ? 5 : 0);
         feedback.className = 'typing-feedback ok';
-        feedback.textContent = I18N.t('game.typingCorrect');
+        feedback.innerHTML = I18N.t('game.typingCorrect') + ' <strong>' + escapeHtml(w.en) + '</strong>' + ipaStr + speakBtn;
       } else {
         wrong += 1;
         combo = 0;
         feedback.className = 'typing-feedback bad';
-        feedback.textContent = I18N.t('game.typingWrong') + w.en;
+        feedback.innerHTML = I18N.t('game.typingWrong') + '<strong>' + escapeHtml(w.en) + '</strong>' + ipaStr + speakBtn;
+      }
+      if (typeof Pronunciation !== 'undefined') {
+        Pronunciation.bindSpeakers(feedback);
+        Pronunciation.speak(w.en);
       }
 
       input.disabled = true;

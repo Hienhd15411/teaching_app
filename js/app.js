@@ -194,15 +194,20 @@
       const state = SRS.getWordState(progress, topicId, w.en);
       const row = document.createElement('div');
       row.className = 'word-row';
+      const ipaHtml = w.ipa ? `<span class="ipa">${escapeHtml(w.ipa)}</span>` : '';
       row.innerHTML = `
-        <div class="en"></div>
-        <div class="vi"></div>
+        <div class="en">
+          <button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${t('word.listen')}">🔊</button>
+          <span class="w">${escapeHtml(w.en)}</span>
+          ${w.pos ? `<span style="color:var(--text-muted);font-weight:400;font-size:12px;">(${w.pos})</span>` : ''}
+          ${ipaHtml}
+        </div>
+        <div class="vi">${escapeHtml(w.vi)}</div>
         <span class="mastery-dot box-${state.box}" title="Box ${state.box}/5"></span>
       `;
-      row.querySelector('.en').textContent = w.en + (w.pos ? ` (${w.pos})` : '');
-      row.querySelector('.vi').textContent = w.vi;
       wordListEl.appendChild(row);
     });
+    if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(wordListEl);
   }
 
   // ========== Game runner ==========

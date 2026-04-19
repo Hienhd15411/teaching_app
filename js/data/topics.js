@@ -1,61 +1,128 @@
 (function (global) {
   'use strict';
 
-  // Each topic has bilingual title/desc so we can show it directly without i18n lookups.
+  // 12 topics balancing daily conversation (English Vocabulary in Use Pre-Int)
+  // and workplace communication (Business Result Pre-Int).
   global.TOPICS = [
     {
-      id: 'office',
-      icon: '💼',
-      title: { vi: 'Văn phòng', en: 'Office' },
+      id: 'intro_people',
+      icon: '👋',
+      title: { vi: 'Giới thiệu & Mọi người', en: 'Introductions & People' },
       desc: {
-        vi: 'Từ vựng cho công việc thường ngày: đồng nghiệp, họp, email…',
-        en: 'Everyday work vocabulary: colleagues, meetings, emails…',
+        vi: 'Chào hỏi, giới thiệu bản thân, nghề nghiệp, quốc tịch.',
+        en: 'Greetings, self-introduction, jobs, nationalities.',
       },
+      sources: ['Vocab in Use U5, U9', 'Business Result U1'],
     },
     {
-      id: 'home',
+      id: 'family_home',
       icon: '🏠',
-      title: { vi: 'Nhà ở', en: 'Home & Living' },
+      title: { vi: 'Gia đình & Nhà ở', en: 'Family & Home' },
       desc: {
-        vi: 'Nội thất, phòng, đồ gia dụng và sinh hoạt ở nhà.',
-        en: 'Furniture, rooms, appliances and home life.',
+        vi: 'Thành viên gia đình, phòng ốc, đồ gia dụng.',
+        en: 'Family members, rooms, household things.',
       },
+      sources: ['Vocab in Use U14, U17, U18'],
     },
     {
-      id: 'going_out',
-      icon: '🎉',
-      title: { vi: 'Đi chơi', en: 'Going out' },
+      id: 'daily_routines',
+      icon: '⏰',
+      title: { vi: 'Sinh hoạt hằng ngày', en: 'Daily Routines' },
       desc: {
-        vi: 'Cuối tuần, công viên, rạp phim, cà phê với bạn bè.',
-        en: 'Weekends, parks, cinema, coffee with friends.',
+        vi: 'Thức dậy, đi làm, nghỉ ngơi, các thói quen mỗi ngày.',
+        en: 'Waking up, commuting, resting — every-day habits.',
       },
+      sources: ['Vocab in Use U16'],
     },
     {
-      id: 'food',
+      id: 'describing_people',
+      icon: '🧑‍🎨',
+      title: { vi: 'Miêu tả người', en: 'Describing People' },
+      desc: {
+        vi: 'Ngoại hình, tính cách, cảm xúc.',
+        en: 'Appearance, character, feelings.',
+      },
+      sources: ['Vocab in Use U10, U11, U12'],
+    },
+    {
+      id: 'food_restaurants',
       icon: '🍜',
-      title: { vi: 'Ăn uống', en: 'Food & Drink' },
+      title: { vi: 'Ăn uống & Nhà hàng', en: 'Food & Restaurants' },
       desc: {
-        vi: 'Gọi món, nhà hàng, hương vị và thanh toán.',
-        en: 'Ordering, restaurants, flavors and paying the bill.',
+        vi: 'Gọi món, hương vị, thanh toán ở nhà hàng.',
+        en: 'Ordering, flavors, paying at restaurants.',
       },
+      sources: ['Vocab in Use U23, U24, U49'],
     },
     {
-      id: 'travel',
-      icon: '✈️',
-      title: { vi: 'Du lịch', en: 'Travel' },
-      desc: {
-        vi: 'Sân bay, khách sạn, đặt vé và khám phá.',
-        en: 'Airports, hotels, bookings and sightseeing.',
-      },
-    },
-    {
-      id: 'shopping',
+      id: 'shopping_money',
       icon: '🛍️',
-      title: { vi: 'Mua sắm', en: 'Shopping' },
+      title: { vi: 'Mua sắm & Tiền bạc', en: 'Shopping & Money' },
       desc: {
-        vi: 'Giảm giá, size, phòng thử, thanh toán.',
-        en: 'Discounts, sizes, fitting rooms, checkout.',
+        vi: 'Quần áo, giảm giá, thanh toán, ngân hàng.',
+        en: 'Clothes, discounts, paying, banking basics.',
       },
+      sources: ['Vocab in Use U19, U22'],
+    },
+    {
+      id: 'travel_hotels',
+      icon: '✈️',
+      title: { vi: 'Du lịch & Khách sạn', en: 'Travel & Hotels' },
+      desc: {
+        vi: 'Đặt vé, sân bay, nhận/trả phòng, tham quan.',
+        en: 'Booking, airports, check-in, sightseeing.',
+      },
+      sources: ['Vocab in Use U46-50', 'Business Result U7'],
+    },
+    {
+      id: 'health_feelings',
+      icon: '🩺',
+      title: { vi: 'Sức khoẻ & Cảm xúc', en: 'Health & Feelings' },
+      desc: {
+        vi: 'Cơ thể, triệu chứng, cảm xúc tích cực & tiêu cực.',
+        en: 'Body, symptoms, positive & negative feelings.',
+      },
+      sources: ['Vocab in Use U12, U20'],
+    },
+    {
+      id: 'weather_leisure',
+      icon: '⛅',
+      title: { vi: 'Thời tiết & Giải trí', en: 'Weather & Leisure' },
+      desc: {
+        vi: 'Trời mưa nắng, thể thao, âm nhạc, sở thích.',
+        en: 'Rain or shine, sports, music, hobbies.',
+      },
+      sources: ['Vocab in Use U7, U40, U42, U44'],
+    },
+    {
+      id: 'office_jobs',
+      icon: '💼',
+      title: { vi: 'Văn phòng & Công việc', en: 'Office & Jobs' },
+      desc: {
+        vi: 'Nghề nghiệp, đồ dùng văn phòng, cấp bậc.',
+        en: 'Jobs, office items, roles.',
+      },
+      sources: ['Vocab in Use U35-38', 'Business Result U1, U3'],
+    },
+    {
+      id: 'meetings_phone',
+      icon: '📞',
+      title: { vi: 'Họp & Gọi điện', en: 'Meetings & Phoning' },
+      desc: {
+        vi: 'Cuộc họp, điện thoại, email trong công sở.',
+        en: 'Meetings, phone calls, business emails.',
+      },
+      sources: ['Business Result U2, U3, U4', 'Vocab in Use U54'],
+    },
+    {
+      id: 'social_expressions',
+      icon: '💬',
+      title: { vi: 'Giao tiếp xã hội', en: 'Social Expressions' },
+      desc: {
+        vi: 'Xin lỗi, đồng ý, từ chối, đưa ra lời mời.',
+        en: 'Apologies, agreeing, declining, invitations.',
+      },
+      sources: ['Vocab in Use U65-69', 'Business Result U11'],
     },
   ];
 })(window);

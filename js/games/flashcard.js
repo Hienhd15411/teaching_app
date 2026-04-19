@@ -30,22 +30,49 @@
     function renderCard() {
       if (idx >= words.length) return finish();
       const w = words[idx];
+      const ipa = w.ipa ? `<div class="ipa">${escapeHtml(w.ipa)}</div>` : '';
+      const speakBtn = `<button class="speak-btn big" data-speak="${escapeAttr(w.en)}" title="${t('word.listen')}">🔊</button>`;
+
+      let extras = '';
+      if (flipped) {
+        const rows = [];
+        if (w.example) {
+          rows.push(`
+            <div class="row">
+              <div class="label">${t('word.example')}</div>
+              <div class="value" style="font-style:italic;">${escapeHtml(w.example)}</div>
+            </div>`);
+        }
+        if (w.syn && w.syn.length) {
+          rows.push(`
+            <div class="row">
+              <div class="label">${t('word.synonym')}</div>
+              <div class="syn-list">${w.syn.map((s) => `<span>${escapeHtml(s)}</span>`).join('')}</div>
+            </div>`);
+        }
+        if (w.ant && w.ant.length) {
+          rows.push(`
+            <div class="row">
+              <div class="label">${t('word.antonym')}</div>
+              <div class="ant-list">${w.ant.map((a) => `<span>${escapeHtml(a)}</span>`).join('')}</div>
+            </div>`);
+        }
+        if (rows.length) {
+          extras = `<div class="word-extras">${rows.join('')}</div>`;
+        }
+      }
 
       container.innerHTML = `
         <section class="view game-view">
           ${renderHud()}
           <div class="flashcard-stage">
             <div class="flashcard" id="card">
-              ${flipped ? `
-                <div class="big-word">${escapeHtml(w.en)}</div>
-                <div class="pos">${w.pos || ''}</div>
-                <div class="meaning">${escapeHtml(w.vi)}</div>
-                <div class="example">${escapeHtml(w.example || '')}</div>
-              ` : `
-                <div class="big-word">${escapeHtml(w.en)}</div>
-                <div class="pos">${w.pos || ''}</div>
-                <div class="hint">${t('game.tapToFlip')}</div>
-              `}
+              <div class="big-word">${escapeHtml(w.en)} ${speakBtn}</div>
+              ${ipa}
+              <div class="pos">${w.pos || ''}</div>
+              ${flipped
+                ? `<div class="meaning">${escapeHtml(w.vi)}</div>${extras}`
+                : `<div class="hint">${t('game.tapToFlip')}</div>`}
             </div>
           </div>
           ${flipped ? `
@@ -59,7 +86,8 @@
       `;
 
       container.querySelector('#exitBtn').addEventListener('click', onExit);
-      container.querySelector('#card').addEventListener('click', () => {
+      container.querySelector('#card').addEventListener('click', (e) => {
+        if (e.target.closest('.speak-btn')) return;
         if (!flipped) {
           flipped = true;
           renderCard();
@@ -70,6 +98,7 @@
         container.querySelector('#good').addEventListener('click', () => rate('good'));
         container.querySelector('#easy').addEventListener('click', () => rate('easy'));
       }
+      if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(container);
     }
 
     function rate(level) {
@@ -110,6 +139,7 @@
   function escapeHtml(str) {
     return String(str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
+  function escapeAttr(s) { return escapeHtml(s); }
 
   global.FlashcardGame = { start };
 })(window);

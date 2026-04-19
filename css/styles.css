@@ -343,8 +343,74 @@ input[type="text"]:focus { border-color: var(--primary); }
   align-items: center;
 }
 .word-row:last-child { border-bottom: none; }
-.word-row .en { font-weight: 600; }
+.word-row .en { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .word-row .vi { color: var(--text-muted); }
+.word-row .ipa {
+  font-family: "Charis SIL", "Doulos SIL", "Gentium Plus", Georgia, serif;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.speak-btn {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  color: var(--primary-hover);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.speak-btn:hover { background: var(--border); }
+.speak-btn:active { transform: scale(0.92); }
+.speak-btn.big { padding: 6px 12px; font-size: 16px; }
+
+.word-extras {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  text-align: left;
+  max-width: 420px;
+  width: 100%;
+}
+.word-extras .row {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 8px;
+  color: var(--text-muted);
+}
+.word-extras .row .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  align-self: center;
+}
+.word-extras .row .value { color: var(--text); }
+.word-extras .syn-list, .word-extras .ant-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.word-extras .syn-list span,
+.word-extras .ant-list span {
+  background: var(--bg-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.word-extras .syn-list span { border: 1px solid rgba(34, 197, 94, 0.4); }
+.word-extras .ant-list span { border: 1px solid rgba(239, 68, 68, 0.4); }
+
+.flashcard .ipa {
+  color: var(--text-muted);
+  font-family: "Charis SIL", "Doulos SIL", "Gentium Plus", Georgia, serif;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
 .mastery-dot {
   width: 10px;
   height: 10px;
