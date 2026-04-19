@@ -625,8 +625,27 @@ input[type="text"]:focus { border-color: var(--primary); }
 .typing-feedback .syn-list span { border: 1px solid rgba(34, 197, 94, 0.4); }
 .typing-feedback .ant-list span { border: 1px solid rgba(239, 68, 68, 0.4); }
 .typing-feedback .fb-actions {
-  margin-top: 12px; display: flex; justify-content: flex-end;
+  margin-top: 14px; display: flex; justify-content: flex-end;
 }
+.typing-feedback .fb-actions-row {
+  margin: 10px 0 14px; display: flex; justify-content: center;
+}
+.btn.listen-again {
+  background: var(--bg-card);
+  color: var(--primary-hover);
+  border: 2px solid var(--primary);
+  font-weight: 700;
+  padding: 10px 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.btn.listen-again:hover {
+  background: var(--primary);
+  color: white;
+}
+.btn.listen-again:active { transform: scale(0.96); }
 .typing-prompt .pos-hint {
   color: var(--text-muted); font-size: 13px; margin-top: 6px;
 }

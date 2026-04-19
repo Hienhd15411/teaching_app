@@ -89,9 +89,8 @@
       input.disabled = true;
       container.querySelector('#submitBtn').style.display = 'none';
 
-      // Build detailed feedback: big icon + answer + IPA + audio + example + syn/ant
+      // Build detailed feedback: big icon + answer + IPA + prominent listen-again + example + syn/ant
       const ipaStr = w.ipa ? `<span class="ipa">/${escapeHtml(w.ipa)}/</span>` : '';
-      const speakBtn = `<button class="speak-btn big" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>`;
       const bigIcon = isCorrect
         ? '<div class="fb-big-icon ok">✓</div>'
         : '<div class="fb-big-icon bad">✗</div>';
@@ -100,9 +99,10 @@
         : `<div class="fb-status bad">${I18N.t('game.typingWrong')}</div>`;
       const wordBlock = `
         <div class="fb-word">
-          <strong>${escapeHtml(w.en)}</strong> ${ipaStr} ${speakBtn}
+          <strong>${escapeHtml(w.en)}</strong> ${ipaStr}
         </div>
         <div class="fb-meaning">${I18N.t('game.meaning')}: <em>${escapeHtml(w.vi)}</em></div>`;
+      const listenBtn = `<button class="btn listen-again" data-speak="${escapeHtml(w.en)}" type="button">🔊 ${I18N.t('word.listenAgain')}</button>`;
       const exampleBlock = w.example
         ? `<div class="fb-example">${escapeHtml(w.example)}</div>` : '';
       const synBlock = (w.syn && w.syn.length)
@@ -111,10 +111,13 @@
       const antBlock = (w.ant && w.ant.length)
         ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.antonym')}</span><span class="ant-list">${w.ant.map((a) => `<span>${escapeHtml(a)}</span>`).join('')}</span></div>`
         : '';
-      const nextBtn = `<button class="btn" id="nextBtn" autofocus>${I18N.t('game.next')} →</button>`;
+      const nextBtn = `<button class="btn" id="nextBtn">${I18N.t('game.next')} →</button>`;
 
       feedback.className = 'typing-feedback ' + (isCorrect ? 'ok' : 'bad');
-      feedback.innerHTML = bigIcon + header + wordBlock + exampleBlock + synBlock + antBlock + `<div class="fb-actions">${nextBtn}</div>`;
+      feedback.innerHTML = bigIcon + header + wordBlock
+        + `<div class="fb-actions-row">${listenBtn}</div>`
+        + exampleBlock + synBlock + antBlock
+        + `<div class="fb-actions">${nextBtn}</div>`;
 
       if (typeof Pronunciation !== 'undefined') {
         Pronunciation.bindSpeakers(feedback);
