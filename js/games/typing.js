@@ -89,16 +89,20 @@
       input.disabled = true;
       container.querySelector('#submitBtn').style.display = 'none';
 
-      // Build detailed feedback: status + answer + IPA + audio + example + syn/ant
-      const ipaStr = w.ipa ? `<span class="ipa">${escapeHtml(w.ipa)}</span>` : '';
-      const speakBtn = `<button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>`;
+      // Build detailed feedback: big icon + answer + IPA + audio + example + syn/ant
+      const ipaStr = w.ipa ? `<span class="ipa">/${escapeHtml(w.ipa)}/</span>` : '';
+      const speakBtn = `<button class="speak-btn big" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>`;
+      const bigIcon = isCorrect
+        ? '<div class="fb-big-icon ok">✓</div>'
+        : '<div class="fb-big-icon bad">✗</div>';
       const header = isCorrect
         ? `<div class="fb-status ok">${I18N.t('game.typingCorrect')}</div>`
-        : `<div class="fb-status bad">${I18N.t('game.typingWrong')} <strong>${escapeHtml(w.en)}</strong></div>`;
+        : `<div class="fb-status bad">${I18N.t('game.typingWrong')}</div>`;
       const wordBlock = `
         <div class="fb-word">
           <strong>${escapeHtml(w.en)}</strong> ${ipaStr} ${speakBtn}
-        </div>`;
+        </div>
+        <div class="fb-meaning">${I18N.t('game.meaning')}: <em>${escapeHtml(w.vi)}</em></div>`;
       const exampleBlock = w.example
         ? `<div class="fb-example">${escapeHtml(w.example)}</div>` : '';
       const synBlock = (w.syn && w.syn.length)
@@ -110,7 +114,7 @@
       const nextBtn = `<button class="btn" id="nextBtn" autofocus>${I18N.t('game.next')} →</button>`;
 
       feedback.className = 'typing-feedback ' + (isCorrect ? 'ok' : 'bad');
-      feedback.innerHTML = header + wordBlock + exampleBlock + synBlock + antBlock + `<div class="fb-actions">${nextBtn}</div>`;
+      feedback.innerHTML = bigIcon + header + wordBlock + exampleBlock + synBlock + antBlock + `<div class="fb-actions">${nextBtn}</div>`;
 
       if (typeof Pronunciation !== 'undefined') {
         Pronunciation.bindSpeakers(feedback);
