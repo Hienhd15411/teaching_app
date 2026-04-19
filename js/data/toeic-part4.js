@@ -1,4 +1,130 @@
 (function () {
   'use strict';
-  // TOEIC Part 4 word data — populated in follow-up commits.
+  if (typeof TOEIC === 'undefined') return;
+
+  // Part 4 · Short Talks (announcements, voicemails, ads, tour info, news).
+  // Curated from public TOEIC prep materials. Not ETS.
+
+  // ---- 2023 edition ----
+  TOEIC.setPart('2023', 'part4', 'keywords', [
+    { en: 'announce', vi: 'thông báo', pos: 'v', ipa: 'əˈnaʊns', example: 'The airline announced a new route.' },
+    { en: 'announcement', vi: 'thông báo', pos: 'n', ipa: 'əˈnaʊnsmənt', example: 'An announcement is being made.' },
+    { en: 'attention', vi: 'xin lưu ý', pos: 'n', ipa: 'əˈtenʃn', example: 'May I have your attention, please?' },
+    { en: 'passenger', vi: 'hành khách', pos: 'n', ipa: 'ˈpæsɪndʒə', example: 'All passengers should proceed to gate B.' },
+    { en: 'remind', vi: 'nhắc nhở', pos: 'v', ipa: 'rɪˈmaɪnd', example: "I'd like to remind you about the policy." },
+    { en: 'be held', vi: 'được tổ chức', pos: 'phr', ipa: 'biː held', example: 'The event will be held next Friday.' },
+    { en: 'invite', vi: 'mời', pos: 'v', ipa: 'ɪnˈvaɪt', example: 'All staff are invited to the ceremony.' },
+    { en: 'purpose', vi: 'mục đích', pos: 'n', ipa: 'ˈpɜːpəs', example: 'What is the purpose of the talk?' },
+    { en: 'addressing', vi: 'phát biểu trước', pos: 'v', ipa: 'əˈdresɪŋ', example: 'She is addressing the audience.' },
+    { en: 'broadcast', vi: 'phát sóng', pos: 'v', ipa: 'ˈbrɔːdkɑːst', example: 'The interview will be broadcast tonight.' },
+  ]);
+  TOEIC.setPart('2023', 'part4', 'highFreq', [
+    { en: 'voicemail', vi: 'tin nhắn thoại', pos: 'n', ipa: 'ˈvɔɪsmeɪl', example: 'Please leave a voicemail.' },
+    { en: 'gate', vi: 'cửa lên máy bay', pos: 'n', ipa: 'ɡeɪt', example: 'The gate has been changed.' },
+    { en: 'flight', vi: 'chuyến bay', pos: 'n', ipa: 'flaɪt', example: 'Flight 412 is now boarding.' },
+    { en: 'traffic', vi: 'giao thông', pos: 'n', ipa: 'ˈtræfɪk', example: 'Traffic is heavy on the bridge.' },
+    { en: 'weather', vi: 'thời tiết', pos: 'n', ipa: 'ˈweðə', example: 'Weather conditions will improve.' },
+    { en: 'sale', vi: 'đợt giảm giá', pos: 'n', ipa: 'seɪl', example: 'Our summer sale starts tomorrow.' },
+    { en: 'offer', vi: 'ưu đãi', pos: 'n', ipa: 'ˈɒfə', example: "Don't miss this limited offer." },
+    { en: 'feature', vi: 'tính năng', pos: 'n', ipa: 'ˈfiːtʃə', example: 'The app has many new features.' },
+    { en: 'promotion', vi: 'khuyến mãi', pos: 'n', ipa: 'prəˈməʊʃn', example: "We're running a holiday promotion." },
+    { en: 'audience', vi: 'khán giả', pos: 'n', ipa: 'ˈɔːdiəns', example: 'The audience applauded loudly.' },
+    { en: 'tour', vi: 'chuyến tham quan', pos: 'n', ipa: 'tʊə', example: 'The tour starts at the main entrance.' },
+    { en: 'guide', vi: 'hướng dẫn viên', pos: 'n', ipa: 'ɡaɪd', example: "Your tour guide will meet you here." },
+    { en: 'exhibit', vi: 'triển lãm', pos: 'n', ipa: 'ɪɡˈzɪbɪt', example: 'The exhibit opens at 9 a.m.' },
+    { en: 'opening', vi: 'buổi khai mạc', pos: 'n', ipa: 'ˈəʊpnɪŋ', example: 'The opening is scheduled for Friday.' },
+    { en: 'construction', vi: 'xây dựng', pos: 'n', ipa: 'kənˈstrʌkʃn', example: 'Construction will cause delays.' },
+    { en: 'detour', vi: 'đường vòng', pos: 'n', ipa: 'ˈdiːtʊə', example: 'A detour is in place on Main Street.' },
+    { en: 'avoid', vi: 'tránh', pos: 'v', ipa: 'əˈvɔɪd', example: 'Drivers should avoid Route 9.' },
+    { en: 'expect', vi: 'mong đợi, dự kiến', pos: 'v', ipa: 'ɪkˈspekt', example: 'Expect showers this afternoon.' },
+    { en: 'postpone', vi: 'hoãn', pos: 'v', ipa: 'pəˈspəʊn', example: 'The outdoor event has been postponed.' },
+    { en: 'attend', vi: 'tham dự', pos: 'v', ipa: 'əˈtend', example: 'Thank you for attending today.' },
+    { en: 'introduce', vi: 'giới thiệu', pos: 'v', ipa: 'ˌɪntrəˈdjuːs', example: 'Let me introduce our guest speaker.' },
+    { en: 'welcome', vi: 'chào đón', pos: 'v', ipa: 'ˈwelkəm', example: 'Welcome aboard flight 88.' },
+    { en: 'expected', vi: 'được mong đợi', pos: 'adj', ipa: 'ɪkˈspektɪd', example: 'Attendance is higher than expected.' },
+    { en: 'delayed', vi: 'bị hoãn', pos: 'adj', ipa: 'dɪˈleɪd', example: 'The train is delayed by 20 minutes.' },
+    { en: 'on behalf of', vi: 'thay mặt', pos: 'phr', ipa: 'ɒn bɪˈhɑːf əv', example: "On behalf of the team, welcome." },
+  ]);
+
+  // ---- 2024 edition ----
+  TOEIC.setPart('2024', 'part4', 'keywords', [
+    { en: 'according to', vi: 'theo (nguồn)', pos: 'phr', ipa: 'əˈkɔːdɪŋ tuː', example: 'According to the announcement, the flight is delayed.' },
+    { en: 'state', vi: 'nêu rõ', pos: 'v', ipa: 'steɪt', example: 'The speaker states the event is sold out.' },
+    { en: 'point out', vi: 'chỉ ra', pos: 'phr', ipa: 'pɔɪnt aʊt', example: 'She points out several key dates.' },
+    { en: 'urge', vi: 'thúc giục', pos: 'v', ipa: 'ɜːdʒ', example: 'He urges listeners to register early.' },
+    { en: 'warn', vi: 'cảnh báo', pos: 'v', ipa: 'wɔːn', example: 'Officials warn of heavy rainfall.' },
+    { en: 'look forward to', vi: 'mong chờ', pos: 'phr', ipa: 'lʊk ˈfɔːwəd tuː', example: 'We look forward to seeing you there.' },
+    { en: 'feel free to', vi: 'cứ tự nhiên', pos: 'phr', ipa: 'fiːl friː tuː', example: 'Feel free to ask questions.' },
+    { en: 'be advised', vi: 'được khuyến cáo', pos: 'phr', ipa: 'bi ədˈvaɪzd', example: 'Passengers are advised to arrive early.' },
+    { en: 'sincerely', vi: 'chân thành', pos: 'adv', ipa: 'sɪnˈsɪəli', example: 'We sincerely apologise for the delay.' },
+    { en: 'accordingly', vi: 'theo đó', pos: 'adv', ipa: 'əˈkɔːdɪŋli', example: 'Please plan your route accordingly.' },
+  ]);
+  TOEIC.setPart('2024', 'part4', 'highFreq', [
+    { en: 'listener', vi: 'người nghe', pos: 'n', ipa: 'ˈlɪsnə', example: 'Listeners can call the hotline.' },
+    { en: 'caller', vi: 'người gọi', pos: 'n', ipa: 'ˈkɔːlə', example: 'Our next caller is from Boston.' },
+    { en: 'host', vi: 'người dẫn chương trình', pos: 'n', ipa: 'həʊst', example: 'Our host will introduce the speaker.' },
+    { en: 'sponsor', vi: 'nhà tài trợ', pos: 'n', ipa: 'ˈspɒnsə', example: 'Thanks to our sponsor for the event.' },
+    { en: 'forecast', vi: 'dự báo', pos: 'n', ipa: 'ˈfɔːkɑːst', example: 'Today\u2019s forecast calls for rain.' },
+    { en: 'departure', vi: 'khởi hành', pos: 'n', ipa: 'dɪˈpɑːtʃə', example: 'Departure is scheduled for 10 p.m.' },
+    { en: 'arrival', vi: 'đến nơi', pos: 'n', ipa: 'əˈraɪvl', example: 'Arrival is expected at midnight.' },
+    { en: 'lane', vi: 'làn đường', pos: 'n', ipa: 'leɪn', example: 'The right lane is closed.' },
+    { en: 'route', vi: 'tuyến đường', pos: 'n', ipa: 'ruːt', example: 'Take an alternate route.' },
+    { en: 'rush hour', vi: 'giờ cao điểm', pos: 'n', ipa: 'rʌʃ aʊə', example: 'Avoid downtown during rush hour.' },
+    { en: 'backup', vi: 'kẹt cứng', pos: 'n', ipa: 'ˈbækʌp', example: "There's a backup on the highway." },
+    { en: 'commercial', vi: 'quảng cáo', pos: 'n', ipa: 'kəˈmɜːʃl', example: "We'll be back after this commercial." },
+    { en: 'participant', vi: 'người tham gia', pos: 'n', ipa: 'pɑːˈtɪsɪpənt', example: 'All participants receive a handbook.' },
+    { en: 'attendee', vi: 'người tham dự', pos: 'n', ipa: 'ˌætenˈdiː', example: 'Attendees must wear badges.' },
+    { en: 'registration', vi: 'đăng ký', pos: 'n', ipa: 'ˌredʒɪˈstreɪʃn', example: 'Registration closes at 5 p.m.' },
+    { en: 'orientation', vi: 'buổi định hướng', pos: 'n', ipa: 'ˌɔːriənˈteɪʃn', example: 'Orientation begins at 9 in the auditorium.' },
+    { en: 'briefly', vi: 'ngắn gọn', pos: 'adv', ipa: 'ˈbriːfli', example: "I'll speak briefly about the new policy." },
+    { en: 'in advance', vi: 'trước', pos: 'phr', ipa: 'ɪn ədˈvɑːns', example: 'Register in advance to save your seat.' },
+    { en: 'on time', vi: 'đúng giờ', pos: 'phr', ipa: 'ɒn taɪm', example: 'The ceremony started on time.' },
+    { en: 'due to', vi: 'do bởi', pos: 'phr', ipa: 'djuː tuː', example: 'The delay is due to weather.' },
+    { en: 'starting from', vi: 'bắt đầu từ', pos: 'phr', ipa: 'ˈstɑːtɪŋ frəm', example: 'Starting from Monday, hours will change.' },
+    { en: 'throughout', vi: 'xuyên suốt', pos: 'prep', ipa: 'θruːˈaʊt', example: 'Showers are expected throughout the morning.' },
+    { en: 'brief', vi: 'ngắn gọn', pos: 'adj', ipa: 'briːf', example: 'Here is a brief update.' },
+    { en: 'upcoming', vi: 'sắp tới', pos: 'adj', ipa: 'ˈʌpkʌmɪŋ', example: "Here's an overview of the upcoming event." },
+    { en: 'following', vi: 'tiếp theo', pos: 'prep', ipa: 'ˈfɒləʊɪŋ', example: "Following this talk, there will be a Q&A." },
+  ]);
+
+  // ---- 2026 edition ----
+  TOEIC.setPart('2026', 'part4', 'keywords', [
+    { en: 'most likely', vi: 'có nhiều khả năng', pos: 'phr', ipa: 'məʊst ˈlaɪkli', example: 'Who is the speaker most likely addressing?' },
+    { en: 'intended for', vi: 'dành cho', pos: 'phr', ipa: 'ɪnˈtendɪd fə', example: 'Who is the announcement intended for?' },
+    { en: 'take place', vi: 'diễn ra', pos: 'phr', ipa: 'teɪk pleɪs', example: 'The ceremony will take place in the lobby.' },
+    { en: 'keep in mind', vi: 'lưu ý', pos: 'phr', ipa: 'kiːp ɪn maɪnd', example: 'Keep in mind that seats are limited.' },
+    { en: 'be sure to', vi: 'nhớ chắc chắn', pos: 'phr', ipa: 'bi ʃʊə tuː', example: 'Be sure to bring your ticket.' },
+    { en: 'as a reminder', vi: 'để nhắc lại', pos: 'phr', ipa: 'əz ə rɪˈmaɪndə', example: 'As a reminder, the gym closes at 10.' },
+    { en: 'encourage', vi: 'khuyến khích', pos: 'v', ipa: 'ɪnˈkʌrɪdʒ', example: 'We encourage everyone to attend.' },
+    { en: 'highlight', vi: 'nhấn mạnh', pos: 'v', ipa: 'ˈhaɪlaɪt', example: 'The speaker highlights three new policies.' },
+    { en: 'describe', vi: 'mô tả', pos: 'v', ipa: 'dɪˈskraɪb', example: 'He describes the new building.' },
+    { en: 'emphasize', vi: 'nhấn mạnh', pos: 'v', ipa: 'ˈemfəsaɪz', example: 'She emphasises punctuality.' },
+  ]);
+  TOEIC.setPart('2026', 'part4', 'highFreq', [
+    { en: 'podcast', vi: 'chương trình podcast', pos: 'n', ipa: 'ˈpɒdkɑːst', example: "Today's podcast features a guest speaker." },
+    { en: 'episode', vi: 'tập (podcast, show)', pos: 'n', ipa: 'ˈepɪsəʊd', example: 'This is episode 12 of our series.' },
+    { en: 'trailer', vi: 'đoạn giới thiệu', pos: 'n', ipa: 'ˈtreɪlə', example: 'Watch the trailer on our website.' },
+    { en: 'keynote', vi: 'bài diễn văn chính', pos: 'n', ipa: 'ˈkiːnəʊt', example: 'The keynote begins at 10.' },
+    { en: 'refreshment', vi: 'đồ ăn nhẹ', pos: 'n', ipa: 'rɪˈfreʃmənt', example: 'Light refreshments will be served.' },
+    { en: 'keynote speaker', vi: 'diễn giả chính', pos: 'n', ipa: 'ˈkiːnəʊt ˈspiːkə', example: 'Please welcome our keynote speaker.' },
+    { en: 'ceremony', vi: 'buổi lễ', pos: 'n', ipa: 'ˈserəməni', example: 'The ribbon-cutting ceremony is at noon.' },
+    { en: 'showcase', vi: 'trưng bày', pos: 'n', ipa: 'ˈʃəʊkeɪs', example: 'The showcase runs all week.' },
+    { en: 'fundraiser', vi: 'sự kiện gây quỹ', pos: 'n', ipa: 'ˈfʌndreɪzə', example: 'The annual fundraiser raised €50,000.' },
+    { en: 'conference', vi: 'hội thảo', pos: 'n', ipa: 'ˈkɒnfərəns', example: 'The marketing conference starts Monday.' },
+    { en: 'venue', vi: 'địa điểm', pos: 'n', ipa: 'ˈvenjuː', example: 'The venue has free parking.' },
+    { en: 'entry', vi: 'lối vào', pos: 'n', ipa: 'ˈentri', example: 'Please use the south entry.' },
+    { en: 'parking lot', vi: 'bãi xe', pos: 'n', ipa: 'ˈpɑːkɪŋ lɒt', example: 'The parking lot is full.' },
+    { en: 'shuttle', vi: 'xe đưa đón', pos: 'n', ipa: 'ˈʃʌtl', example: 'A shuttle runs every 20 minutes.' },
+    { en: 'registration desk', vi: 'bàn đăng ký', pos: 'n', ipa: 'ˌredʒɪˈstreɪʃn desk', example: 'Check in at the registration desk.' },
+    { en: 'handout', vi: 'tài liệu phát', pos: 'n', ipa: 'ˈhændaʊt', example: 'Please take a handout at the door.' },
+    { en: 'raffle', vi: 'xổ số nhỏ', pos: 'n', ipa: 'ˈræfl', example: 'Enter the raffle to win a gift card.' },
+    { en: 'showcase', vi: 'giới thiệu, trưng bày', pos: 'v', ipa: 'ˈʃəʊkeɪs', example: 'The event showcases local artists.' },
+    { en: 'conclude', vi: 'kết thúc', pos: 'v', ipa: 'kənˈkluːd', example: 'The event concludes at 6 p.m.' },
+    { en: 'approach', vi: 'tiếp cận', pos: 'v', ipa: 'əˈprəʊtʃ', example: 'Please approach the microphone.' },
+    { en: 'dedicate', vi: 'dành tặng', pos: 'v', ipa: 'ˈdedɪkeɪt', example: 'The library is dedicated to our founder.' },
+    { en: 'celebrate', vi: 'ăn mừng', pos: 'v', ipa: 'ˈselɪbreɪt', example: 'We are celebrating 20 years.' },
+    { en: 'live', vi: 'trực tiếp', pos: 'adj', ipa: 'laɪv', example: "We're live from Central Square." },
+    { en: 'upcoming', vi: 'sắp tới', pos: 'adj', ipa: 'ˈʌpkʌmɪŋ', example: 'Mark your calendar for the upcoming event.' },
+    { en: 'annual', vi: 'thường niên', pos: 'adj', ipa: 'ˈænjuəl', example: 'The annual gala is next month.' },
+  ]);
 })();
