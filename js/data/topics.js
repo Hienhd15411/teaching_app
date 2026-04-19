@@ -124,5 +124,105 @@
       },
       sources: ['Vocab in Use U65-69', 'Business Result U11'],
     },
+    {
+      id: 'body_parts',
+      icon: '🧍',
+      title: { vi: 'Cơ thể & Cử động', en: 'Body & Movement' },
+      desc: {
+        vi: 'Bộ phận cơ thể, cử động, ngôn ngữ cơ thể.',
+        en: 'Body parts, movement, body language.',
+      },
+      sources: ['Vocab in Use U9'],
+    },
+    {
+      id: 'clothes_fashion',
+      icon: '👗',
+      title: { vi: 'Quần áo & Thời trang', en: 'Clothes & Fashion' },
+      desc: {
+        vi: 'Trang phục, phụ kiện, phong cách, kích cỡ.',
+        en: 'Outfits, accessories, styles, sizes.',
+      },
+      sources: ['Vocab in Use U21'],
+    },
+    {
+      id: 'education',
+      icon: '🎓',
+      title: { vi: 'Học hành & Trường lớp', en: 'Education & Study' },
+      desc: {
+        vi: 'Lớp học, môn học, thi cử, đại học.',
+        en: 'Classroom, subjects, exams, university.',
+      },
+      sources: ['Vocab in Use U30-34'],
+    },
+    {
+      id: 'transport',
+      icon: '🚌',
+      title: { vi: 'Giao thông & Đường phố', en: 'Transport & the Road' },
+      desc: {
+        vi: 'Phương tiện, lái xe, biển báo, giao thông.',
+        en: 'Vehicles, driving, road signs, traffic.',
+      },
+      sources: ['Vocab in Use U27-29'],
+    },
+    {
+      id: 'city_life',
+      icon: '🏙️',
+      title: { vi: 'Đời sống thành phố', en: 'City Life' },
+      desc: {
+        vi: 'Tiện ích, địa điểm, hướng đi, trải nghiệm đô thị.',
+        en: 'Amenities, places, directions, urban life.',
+      },
+      sources: ['Vocab in Use U26'],
+    },
+    {
+      id: 'tech_internet',
+      icon: '💻',
+      title: { vi: 'Công nghệ & Internet', en: 'Technology & Internet' },
+      desc: {
+        vi: 'Máy tính, điện thoại, mạng xã hội, email.',
+        en: 'Computers, phones, social media, email.',
+      },
+      sources: ['Vocab in Use U51, U53, U55'],
+    },
+    {
+      id: 'events_festivals',
+      icon: '🎉',
+      title: { vi: 'Sự kiện & Lễ hội', en: 'Special Events & Festivals' },
+      desc: {
+        vi: 'Sinh nhật, đám cưới, Tết, lễ kỷ niệm.',
+        en: 'Birthdays, weddings, Tet, anniversaries.',
+      },
+      sources: ['Vocab in Use U45'],
+    },
+    {
+      id: 'relationships',
+      icon: '💕',
+      title: { vi: 'Tình cảm & Mối quan hệ', en: 'Relationships' },
+      desc: {
+        vi: 'Bạn bè, hẹn hò, tình yêu, gia đình mở rộng.',
+        en: 'Friends, dating, love, extended family.',
+      },
+      sources: ['Vocab in Use U13, U15'],
+    },
+    {
+      id: 'sales_marketing',
+      icon: '📢',
+      title: { vi: 'Bán hàng & Marketing', en: 'Sales & Marketing' },
+      desc: {
+        vi: 'Quảng cáo, khuyến mãi, thị trường, khách hàng.',
+        en: 'Advertising, promotions, markets, clients.',
+      },
+      sources: ['Business Result U9'],
+    },
+    {
+      id: 'presentations',
+      icon: '🎤',
+      title: { vi: 'Thuyết trình & Đào tạo', en: 'Presentations & Training' },
+      desc: {
+        vi: 'Slide, số liệu, mô tả biểu đồ, hỏi đáp.',
+        en: 'Slides, figures, describing charts, Q&A.',
+      },
+      sources: ['Business Result U4, U12, U15, U16'],
+    },
   ];
 })(window);
