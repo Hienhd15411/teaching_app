@@ -548,11 +548,59 @@ input[type="text"]:focus { border-color: var(--primary); }
 }
 .typing-feedback {
   margin-top: 14px;
-  font-weight: 600;
   min-height: 22px;
 }
-.typing-feedback.ok { color: var(--success); }
-.typing-feedback.bad { color: var(--danger); }
+.typing-feedback:empty { min-height: 0; }
+.typing-feedback.ok, .typing-feedback.bad {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+}
+.typing-feedback.ok { border-color: rgba(34, 197, 94, 0.5); }
+.typing-feedback.bad { border-color: rgba(239, 68, 68, 0.5); }
+
+.typing-feedback .fb-status { font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+.typing-feedback .fb-status.ok { color: var(--success); }
+.typing-feedback .fb-status.bad { color: var(--danger); }
+.typing-feedback .fb-word {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 20px; margin-bottom: 8px;
+}
+.typing-feedback .fb-word .ipa {
+  font-family: "Charis SIL", "Doulos SIL", Georgia, serif;
+  color: var(--text-muted); font-size: 14px; font-weight: 400;
+}
+.typing-feedback .fb-example {
+  color: var(--text); font-style: italic; margin-bottom: 8px;
+  padding: 8px 10px; background: rgba(255,255,255,0.02);
+  border-left: 3px solid var(--primary); border-radius: 4px;
+}
+.typing-feedback .fb-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-top: 6px; font-size: 13px;
+}
+.typing-feedback .fb-label {
+  color: var(--text-muted); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  min-width: 72px; padding-top: 4px;
+}
+.typing-feedback .syn-list, .typing-feedback .ant-list {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.typing-feedback .syn-list span,
+.typing-feedback .ant-list span {
+  background: var(--bg-card); padding: 2px 8px;
+  border-radius: 999px; font-size: 12px;
+}
+.typing-feedback .syn-list span { border: 1px solid rgba(34, 197, 94, 0.4); }
+.typing-feedback .ant-list span { border: 1px solid rgba(239, 68, 68, 0.4); }
+.typing-feedback .fb-actions {
+  margin-top: 12px; display: flex; justify-content: flex-end;
+}
+.typing-prompt .pos-hint {
+  color: var(--text-muted); font-size: 13px; margin-top: 6px;
+}
 
 /* Matching */
 .matching-grid {

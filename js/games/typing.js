@@ -30,13 +30,16 @@
     function render() {
       if (idx >= words.length) return finish();
       const w = words[idx];
+      const posHint = w.pos
+        ? `<div class="pos-hint">(${escapeHtml(w.pos)}) · ${escapeHtml(w.en.length + '')} ${t('word.letters') || 'letters'}</div>`
+        : '';
 
       container.innerHTML = `
         <section class="view game-view">
           ${renderHud()}
           <div class="typing-prompt">
             <div class="meaning">${escapeHtml(w.vi)}</div>
-            <div class="example">${w.pos ? '(' + w.pos + ') ' : ''}${escapeHtml(w.example || '')}</div>
+            ${posHint}
           </div>
           <div class="typing-input-row">
             <input type="text" id="typingInput" placeholder="${t('game.typingPlaceholder')}" autocomplete="off" autocorrect="off" spellcheck="false" />
@@ -72,33 +75,60 @@
       SRS.updateWord(progress, topicId, w.en, isCorrect);
       Storage.saveProgress(progress);
 
-      const ipaStr = w.ipa ? ` <span style="font-family:Georgia,serif;color:var(--text-muted);">${escapeHtml(w.ipa)}</span>` : '';
-      const speakBtn = ` <button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>`;
       if (isCorrect) {
         correct += 1;
         combo += 1;
         if (combo > bestCombo) bestCombo = combo;
         xp += 10 + (combo >= 3 ? 5 : 0);
-        feedback.className = 'typing-feedback ok';
-        feedback.innerHTML = I18N.t('game.typingCorrect') + ' <strong>' + escapeHtml(w.en) + '</strong>' + ipaStr + speakBtn;
       } else {
         wrong += 1;
         combo = 0;
-        feedback.className = 'typing-feedback bad';
-        feedback.innerHTML = I18N.t('game.typingWrong') + '<strong>' + escapeHtml(w.en) + '</strong>' + ipaStr + speakBtn;
       }
+
+      // Lock input & swap submit for Next
+      input.disabled = true;
+      container.querySelector('#submitBtn').style.display = 'none';
+
+      // Build detailed feedback: status + answer + IPA + audio + example + syn/ant
+      const ipaStr = w.ipa ? `<span class="ipa">${escapeHtml(w.ipa)}</span>` : '';
+      const speakBtn = `<button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>`;
+      const header = isCorrect
+        ? `<div class="fb-status ok">${I18N.t('game.typingCorrect')}</div>`
+        : `<div class="fb-status bad">${I18N.t('game.typingWrong')} <strong>${escapeHtml(w.en)}</strong></div>`;
+      const wordBlock = `
+        <div class="fb-word">
+          <strong>${escapeHtml(w.en)}</strong> ${ipaStr} ${speakBtn}
+        </div>`;
+      const exampleBlock = w.example
+        ? `<div class="fb-example">${escapeHtml(w.example)}</div>` : '';
+      const synBlock = (w.syn && w.syn.length)
+        ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.synonym')}</span><span class="syn-list">${w.syn.map((s) => `<span>${escapeHtml(s)}</span>`).join('')}</span></div>`
+        : '';
+      const antBlock = (w.ant && w.ant.length)
+        ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.antonym')}</span><span class="ant-list">${w.ant.map((a) => `<span>${escapeHtml(a)}</span>`).join('')}</span></div>`
+        : '';
+      const nextBtn = `<button class="btn" id="nextBtn" autofocus>${I18N.t('game.next')} →</button>`;
+
+      feedback.className = 'typing-feedback ' + (isCorrect ? 'ok' : 'bad');
+      feedback.innerHTML = header + wordBlock + exampleBlock + synBlock + antBlock + `<div class="fb-actions">${nextBtn}</div>`;
+
       if (typeof Pronunciation !== 'undefined') {
         Pronunciation.bindSpeakers(feedback);
         Pronunciation.speak(w.en);
       }
 
-      input.disabled = true;
-      container.querySelector('#submitBtn').disabled = true;
-
-      setTimeout(() => {
+      const nextEl = feedback.querySelector('#nextBtn');
+      const advance = () => {
+        document.removeEventListener('keydown', onKey);
         idx += 1;
         render();
-      }, isCorrect ? 700 : 1400);
+      };
+      const onKey = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); advance(); }
+      };
+      nextEl.addEventListener('click', advance);
+      document.addEventListener('keydown', onKey);
+      nextEl.focus();
     }
 
     function finish() {
