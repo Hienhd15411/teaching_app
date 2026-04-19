@@ -32,8 +32,11 @@
       case 'progress':
         renderProgress();
         break;
-      case 'grammar':
-        renderGrammarStub();
+      case 'toeic':
+        renderToeic();
+        break;
+      case 'toeic-part':
+        renderToeicPart(params.editionId, params.partId);
         break;
       case 'game':
         renderGame(params);
@@ -46,9 +49,17 @@
   function highlightNav(view) {
     navEl.querySelectorAll('.nav-btn').forEach((b) => {
       const v = b.getAttribute('data-view-link');
-      b.classList.toggle('active', v === view || (view === 'topic' && v === 'topics') || (view === 'game' && v === 'topics'));
+      const matches = v === view
+        || (view === 'topic' && v === 'topics')
+        || (view === 'game' && v === 'topics' && !currentToeicContext)
+        || (view === 'game' && v === 'toeic' && currentToeicContext)
+        || (view === 'toeic-part' && v === 'toeic');
+      b.classList.toggle('active', matches);
     });
   }
+
+  // Tracks whether the current game was launched from a TOEIC Part (for routing back).
+  let currentToeicContext = null;
 
   function renderHeader() {
     const p = Storage.getActiveProfile();
@@ -212,26 +223,29 @@
 
   // ========== Game runner ==========
   function renderGame(params) {
-    const { topicId, mode, wordsOverride } = params;
+    const { topicId, mode, wordsOverride, toeicContext } = params;
     const words = wordsOverride && wordsOverride.length ? wordsOverride : (VOCAB[topicId] || []);
-    if (!words.length) return navigate('topic', { topicId });
+    currentToeicContext = toeicContext || null;
+    const exitTarget = toeicContext
+      ? () => navigate('toeic-part', { editionId: toeicContext.editionId, partId: toeicContext.partId })
+      : () => navigate('topic', { topicId });
+    if (!words.length) return exitTarget();
 
-    // Pick session based on SRS priority (max 10)
     const progress = Storage.getProgress();
     const sessionWords = wordsOverride
-      ? words.slice()
+      ? SRS.pickSession(progress, topicId, words.slice(), Math.min(10, words.length))
       : SRS.pickSession(progress, topicId, words, Math.min(10, words.length));
 
     const game = getGameModule(mode);
-    if (!game) return navigate('topic', { topicId });
+    if (!game) return exitTarget();
 
     game.start({
       container: appEl,
       topicId,
       words: sessionWords,
       allTopicWords: words,
-      onExit: () => navigate('topic', { topicId }),
-      onFinish: (result) => handleFinish(Object.assign({ mode, topicId }, result)),
+      onExit: exitTarget,
+      onFinish: (result) => handleFinish(Object.assign({ mode, topicId, toeicContext }, result)),
     });
   }
 
@@ -280,10 +294,26 @@
     `;
 
     appEl.querySelector('#againBtn').addEventListener('click', () => {
-      navigate('game', { topicId: result.topicId, mode: result.mode });
+      if (result.toeicContext) {
+        navigate('game', {
+          topicId: result.topicId,
+          mode: result.mode,
+          wordsOverride: TOEIC.allWordsInPart(result.toeicContext.editionId, result.toeicContext.partId),
+          toeicContext: result.toeicContext,
+        });
+      } else {
+        navigate('game', { topicId: result.topicId, mode: result.mode });
+      }
     });
     appEl.querySelector('#backToTopicBtn').addEventListener('click', () => {
-      navigate('topic', { topicId: result.topicId });
+      if (result.toeicContext) {
+        navigate('toeic-part', {
+          editionId: result.toeicContext.editionId,
+          partId: result.toeicContext.partId,
+        });
+      } else {
+        navigate('topic', { topicId: result.topicId });
+      }
     });
   }
 
@@ -500,13 +530,159 @@
     });
   }
 
-  function renderGrammarStub() {
+  // ========== TOEIC views ==========
+  function renderToeic() {
     const t = I18N.t;
+    const lang = I18N.getLang();
+
+    const editionCards = TOEIC.EDITIONS.map((ed) => {
+      let totalWords = 0;
+      TOEIC.PARTS.forEach((p) => {
+        totalWords += TOEIC.allWordsInPart(ed.id, p.id).length;
+      });
+      return `
+        <div class="edition-section" data-edition="${ed.id}">
+          <div class="edition-header">
+            <h2>${ed.label}</h2>
+            <span class="edition-count">${totalWords} ${t('toeic.wordsInGroup')}</span>
+          </div>
+          <div class="topics-grid toeic-parts-grid">
+            ${TOEIC.PARTS.map((p) => {
+              const all = TOEIC.allWordsInPart(ed.id, p.id);
+              const progress = Storage.getProgress();
+              const stats = SRS.topicStats(progress, toeicTopicId(ed.id, p.id), all);
+              return `
+                <div class="topic-card toeic-part-card" data-edition="${ed.id}" data-part="${p.id}">
+                  <div class="title-row">
+                    <span class="icon">${p.icon}</span>
+                    <div>
+                      <div class="title">${p.title[lang]}</div>
+                      <div class="subtitle">${all.length} ${t('toeic.wordsInGroup')}</div>
+                    </div>
+                  </div>
+                  <div class="progress-bar"><span style="width:${stats.masteryPct}%"></span></div>
+                  <div class="stats">
+                    <span>${stats.mastered}/${stats.total} ${t('topics.mastered')}</span>
+                    <span>${stats.masteryPct}%</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
     appEl.innerHTML = `
       <section class="view">
-        <h1>${t('nav.grammar')}</h1>
-        <div class="empty-state">📝 ${t('grammar.soon')}</div>
+        <div class="topics-header">
+          <div>
+            <h1>${t('toeic.title')}</h1>
+            <p>${t('toeic.subtitle')}</p>
+          </div>
+        </div>
+        ${editionCards}
+        <p class="source-note">ℹ️ ${t('toeic.sourceNote')}</p>
       </section>
+    `;
+
+    appEl.querySelectorAll('.toeic-part-card').forEach((el) => {
+      el.addEventListener('click', () => {
+        navigate('toeic-part', {
+          editionId: el.getAttribute('data-edition'),
+          partId: el.getAttribute('data-part'),
+        });
+      });
+    });
+  }
+
+  function toeicTopicId(editionId, partId) {
+    return 'toeic_' + editionId + '_' + partId;
+  }
+
+  function renderToeicPart(editionId, partId) {
+    const t = I18N.t;
+    const lang = I18N.getLang();
+    const ed = TOEIC.EDITIONS.find((e) => e.id === editionId);
+    const part = TOEIC.PARTS.find((p) => p.id === partId);
+    if (!ed || !part) return navigate('toeic');
+
+    const { highFreq, keywords } = TOEIC.getPart(editionId, partId);
+    const allWords = TOEIC.allWordsInPart(editionId, partId);
+    const virtualTopicId = toeicTopicId(editionId, partId);
+    const progress = Storage.getProgress();
+    const stats = SRS.topicStats(progress, virtualTopicId, allWords);
+
+    const renderGroupList = (wordArr, groupLabel) => {
+      if (!wordArr.length) return '';
+      return `
+        <h3 class="group-heading">${groupLabel} <span class="count">(${wordArr.length})</span></h3>
+        <div class="word-list">${wordArr.map((w) => renderWordRow(w, virtualTopicId, progress)).join('')}</div>
+      `;
+    };
+
+    appEl.innerHTML = `
+      <section class="view topic-detail">
+        <button class="back" id="backBtn">${t('topic.back')}</button>
+        <h1>${part.icon} ${ed.label} · ${part.title[lang]}</h1>
+        <div class="progress-bar" style="margin:14px 0;"><span style="width:${stats.masteryPct}%"></span></div>
+        <div style="color:var(--text-muted);font-size:13px;">
+          ${stats.mastered}/${stats.total} ${t('topics.mastered')} · ${stats.masteryPct}%
+        </div>
+
+        <h2 style="margin-top:24px;">${t('topic.chooseMode')}</h2>
+        <div class="mode-grid">
+          <div class="mode-card" data-mode="flashcard">
+            <div class="icon">🎴</div><div class="title">${t('mode.flashcard')}</div>
+            <div class="desc">${t('mode.flashcardDesc')}</div>
+          </div>
+          <div class="mode-card" data-mode="quiz">
+            <div class="icon">❓</div><div class="title">${t('mode.quiz')}</div>
+            <div class="desc">${t('mode.quizDesc')}</div>
+          </div>
+          <div class="mode-card" data-mode="typing">
+            <div class="icon">⌨️</div><div class="title">${t('mode.typing')}</div>
+            <div class="desc">${t('mode.typingDesc')}</div>
+          </div>
+          <div class="mode-card" data-mode="matching">
+            <div class="icon">🔗</div><div class="title">${t('mode.matching')}</div>
+            <div class="desc">${t('mode.matchingDesc')}</div>
+          </div>
+        </div>
+
+        ${renderGroupList(keywords, '🎯 ' + t('toeic.group.keywords'))}
+        ${renderGroupList(highFreq, '📊 ' + t('toeic.group.highFreq'))}
+      </section>
+    `;
+
+    appEl.querySelector('#backBtn').addEventListener('click', () => navigate('toeic'));
+    appEl.querySelectorAll('.mode-card').forEach((el) => {
+      el.addEventListener('click', () => {
+        navigate('game', {
+          topicId: virtualTopicId,
+          mode: el.getAttribute('data-mode'),
+          wordsOverride: allWords,
+          toeicContext: { editionId, partId },
+        });
+      });
+    });
+    if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(appEl);
+  }
+
+  function renderWordRow(w, topicId, progress) {
+    const state = SRS.getWordState(progress, topicId, w.en);
+    const ipaHtml = w.ipa ? `<span class="ipa">${escapeHtml(w.ipa)}</span>` : '';
+    return `
+      <div class="word-row">
+        <div class="en">
+          <button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>
+          <span class="w">${escapeHtml(w.en)}</span>
+          ${w.pos ? `<span style="color:var(--text-muted);font-weight:400;font-size:12px;">(${escapeHtml(w.pos)})</span>` : ''}
+          ${ipaHtml}
+        </div>
+        <div class="vi">${escapeHtml(w.vi)}</div>
+        <span class="mastery-dot box-${state.box}" title="Box ${state.box}/5"></span>
+      </div>
     `;
   }
 
@@ -518,9 +694,7 @@
     document.querySelectorAll('[data-view-link]').forEach((el) => {
       el.addEventListener('click', () => {
         const v = el.getAttribute('data-view-link');
-        if (v === 'grammar') {
-          navigate('grammar');
-        } else if (v === 'topics' || v === 'progress') {
+        if (v === 'topics' || v === 'progress' || v === 'toeic') {
           if (!Storage.getActiveProfileId()) {
             navigate('profile');
           } else {
