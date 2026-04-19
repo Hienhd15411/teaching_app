@@ -1,4 +1,131 @@
 (function () {
   'use strict';
-  // TOEIC Part 5 word data — populated in follow-up commits.
+  if (typeof TOEIC === 'undefined') return;
+
+  // Part 5 · Incomplete Sentences — grammar cues, word-form choices,
+  // prepositions, conjunctions, common adverb/adjective confusions.
+  // Curated from public TOEIC prep resources. Not ETS.
+
+  // ---- 2023 edition ----
+  TOEIC.setPart('2023', 'part5', 'keywords', [
+    { en: 'although', vi: 'mặc dù', pos: 'conj', ipa: 'ɔːlˈðəʊ', example: 'Although it rained, the event continued.', syn: ['though', 'even though'] },
+    { en: 'despite', vi: 'bất chấp', pos: 'prep', ipa: 'dɪˈspaɪt', example: 'Despite the delay, we arrived on time.', syn: ['in spite of'] },
+    { en: 'because of', vi: 'vì', pos: 'prep', ipa: 'bɪˈkɒz əv', example: 'The flight was cancelled because of the storm.' },
+    { en: 'whereas', vi: 'trong khi đó', pos: 'conj', ipa: 'weərˈæz', example: 'Sales rose here, whereas they fell elsewhere.' },
+    { en: 'therefore', vi: 'do đó', pos: 'adv', ipa: 'ˈðeəfɔː', example: 'Costs rose; therefore, prices went up.' },
+    { en: 'however', vi: 'tuy nhiên', pos: 'adv', ipa: 'haʊˈevə', example: 'However, the deadline remained firm.' },
+    { en: 'moreover', vi: 'hơn nữa', pos: 'adv', ipa: 'mɔːˈrəʊvə', example: 'The design is elegant. Moreover, it is affordable.' },
+    { en: 'regarding', vi: 'liên quan đến', pos: 'prep', ipa: 'rɪˈɡɑːdɪŋ', example: 'Regarding your inquiry, please see attached.', syn: ['concerning'] },
+    { en: 'prior to', vi: 'trước khi', pos: 'prep', ipa: 'ˈpraɪə tuː', example: 'Read the manual prior to use.', syn: ['before'] },
+    { en: 'as long as', vi: 'miễn là', pos: 'phr', ipa: 'əz lɒŋ əz', example: 'You can pay later, as long as it clears.' },
+  ]);
+  TOEIC.setPart('2023', 'part5', 'highFreq', [
+    { en: 'efficient', vi: 'hiệu quả', pos: 'adj', ipa: 'ɪˈfɪʃnt', example: 'The new system is more efficient.', ant: ['inefficient'] },
+    { en: 'efficiency', vi: 'hiệu suất', pos: 'n', ipa: 'ɪˈfɪʃnsi', example: 'We aim to improve efficiency.' },
+    { en: 'efficiently', vi: 'một cách hiệu quả', pos: 'adv', ipa: 'ɪˈfɪʃntli', example: 'She manages her time efficiently.' },
+    { en: 'careful', vi: 'cẩn thận', pos: 'adj', ipa: 'ˈkeəfl', example: 'Be careful with the glass.' },
+    { en: 'carefully', vi: 'một cách cẩn thận', pos: 'adv', ipa: 'ˈkeəfli', example: 'Please read the notice carefully.' },
+    { en: 'careless', vi: 'cẩu thả', pos: 'adj', ipa: 'ˈkeələs', example: 'A careless mistake cost us the deal.', ant: ['careful'] },
+    { en: 'attend', vi: 'tham dự', pos: 'v', ipa: 'əˈtend', example: 'Who will attend the session?' },
+    { en: 'attendance', vi: 'sự tham dự', pos: 'n', ipa: 'əˈtendəns', example: 'Attendance is mandatory.' },
+    { en: 'attendee', vi: 'người tham dự', pos: 'n', ipa: 'ˌætenˈdiː', example: 'Each attendee receives a badge.' },
+    { en: 'success', vi: 'thành công', pos: 'n', ipa: 'səkˈses', example: 'The launch was a huge success.' },
+    { en: 'successful', vi: 'thành công', pos: 'adj', ipa: 'səkˈsesfl', example: 'A successful campaign boosts morale.' },
+    { en: 'successfully', vi: 'một cách thành công', pos: 'adv', ipa: 'səkˈsesfli', example: 'They successfully launched the product.' },
+    { en: 'require', vi: 'yêu cầu', pos: 'v', ipa: 'rɪˈkwaɪə', example: 'This role requires three years of experience.' },
+    { en: 'requirement', vi: 'yêu cầu', pos: 'n', ipa: 'rɪˈkwaɪəmənt', example: 'Meet all the requirements before applying.' },
+    { en: 'required', vi: 'bắt buộc', pos: 'adj', ipa: 'rɪˈkwaɪəd', example: 'A valid ID is required.' },
+    { en: 'approve', vi: 'phê duyệt', pos: 'v', ipa: 'əˈpruːv', example: 'The manager approved the plan.' },
+    { en: 'approval', vi: 'sự phê duyệt', pos: 'n', ipa: 'əˈpruːvl', example: 'We await your approval.' },
+    { en: 'considerable', vi: 'đáng kể', pos: 'adj', ipa: 'kənˈsɪdərəbl', example: 'A considerable amount was saved.' },
+    { en: 'considerably', vi: 'đáng kể', pos: 'adv', ipa: 'kənˈsɪdərəbli', example: 'Costs have risen considerably.' },
+    { en: 'rapid', vi: 'nhanh chóng', pos: 'adj', ipa: 'ˈræpɪd', example: 'The company saw rapid growth.' },
+    { en: 'rapidly', vi: 'một cách nhanh chóng', pos: 'adv', ipa: 'ˈræpɪdli', example: 'Demand is growing rapidly.' },
+    { en: 'hardly', vi: 'hầu như không', pos: 'adv', ipa: 'ˈhɑːdli', example: 'I hardly recognise the office anymore.' },
+    { en: 'nearly', vi: 'gần như', pos: 'adv', ipa: 'ˈnɪəli', example: 'We are nearly finished.', syn: ['almost'] },
+    { en: 'mostly', vi: 'phần lớn', pos: 'adv', ipa: 'ˈməʊstli', example: 'Clients are mostly satisfied.' },
+    { en: 'whose', vi: 'của ai', pos: 'pron', ipa: 'huːz', example: 'The employee whose badge was lost must call HR.' },
+  ]);
+
+  // ---- 2024 edition ----
+  TOEIC.setPart('2024', 'part5', 'keywords', [
+    { en: 'while', vi: 'trong khi', pos: 'conj', ipa: 'waɪl', example: 'Please wait while the update installs.' },
+    { en: 'since', vi: 'kể từ khi / vì', pos: 'conj', ipa: 'sɪns', example: "Since she joined, sales have doubled." },
+    { en: 'unless', vi: 'trừ khi', pos: 'conj', ipa: 'ənˈles', example: "We'll proceed unless you object." },
+    { en: 'in order to', vi: 'để mà', pos: 'phr', ipa: 'ɪn ˈɔːdə tuː', example: 'In order to save time, automate the task.' },
+    { en: 'as a result of', vi: 'kết quả là', pos: 'phr', ipa: 'əz ə rɪˈzʌlt əv', example: 'As a result of the merger, staff doubled.' },
+    { en: 'in addition to', vi: 'thêm vào đó', pos: 'phr', ipa: 'ɪn əˈdɪʃn tuː', example: 'In addition to salary, we offer benefits.' },
+    { en: 'rather than', vi: 'hơn là', pos: 'phr', ipa: 'ˈrɑːðə ðən', example: 'Use email rather than phone.' },
+    { en: 'by means of', vi: 'bằng cách', pos: 'phr', ipa: 'baɪ miːnz əv', example: 'The system is updated by means of a script.' },
+    { en: 'no matter', vi: 'dù cho', pos: 'phr', ipa: 'nəʊ ˈmætə', example: "We'll deliver no matter the weather." },
+    { en: 'whether', vi: 'liệu rằng', pos: 'conj', ipa: 'ˈweðə', example: 'She asked whether the room was free.' },
+  ]);
+  TOEIC.setPart('2024', 'part5', 'highFreq', [
+    { en: 'submit', vi: 'nộp', pos: 'v', ipa: 'səbˈmɪt', example: 'Please submit the form by Friday.' },
+    { en: 'submission', vi: 'sự nộp bài', pos: 'n', ipa: 'səbˈmɪʃn', example: 'Submissions close at midnight.' },
+    { en: 'decide', vi: 'quyết định', pos: 'v', ipa: 'dɪˈsaɪd', example: 'She decided to accept the offer.' },
+    { en: 'decision', vi: 'quyết định', pos: 'n', ipa: 'dɪˈsɪʒn', example: 'A final decision is expected soon.' },
+    { en: 'decisive', vi: 'quyết đoán', pos: 'adj', ipa: 'dɪˈsaɪsɪv', example: 'He was decisive under pressure.' },
+    { en: 'compete', vi: 'cạnh tranh', pos: 'v', ipa: 'kəmˈpiːt', example: 'Many firms compete for the contract.' },
+    { en: 'competitive', vi: 'cạnh tranh', pos: 'adj', ipa: 'kəmˈpetətɪv', example: 'Our prices are highly competitive.' },
+    { en: 'competition', vi: 'sự cạnh tranh', pos: 'n', ipa: 'ˌkɒmpəˈtɪʃn', example: 'The competition is fierce in this market.' },
+    { en: 'responsible', vi: 'có trách nhiệm', pos: 'adj', ipa: 'rɪˈspɒnsəbl', example: "She's responsible for marketing." },
+    { en: 'responsibility', vi: 'trách nhiệm', pos: 'n', ipa: 'rɪˌspɒnsəˈbɪləti', example: 'Her responsibilities include hiring.' },
+    { en: 'recent', vi: 'gần đây', pos: 'adj', ipa: 'ˈriːsnt', example: 'A recent study suggests otherwise.' },
+    { en: 'recently', vi: 'gần đây', pos: 'adv', ipa: 'ˈriːsntli', example: 'We recently moved offices.' },
+    { en: 'signify', vi: 'biểu thị', pos: 'v', ipa: 'ˈsɪɡnɪfaɪ', example: 'A rise signifies growing demand.' },
+    { en: 'significant', vi: 'đáng kể', pos: 'adj', ipa: 'sɪɡˈnɪfɪkənt', example: 'A significant drop was observed.' },
+    { en: 'significantly', vi: 'một cách đáng kể', pos: 'adv', ipa: 'sɪɡˈnɪfɪkəntli', example: 'Traffic has increased significantly.' },
+    { en: 'analyse', vi: 'phân tích', pos: 'v', ipa: 'ˈænəlaɪz', example: 'Analyse the results carefully.', syn: ['analyze'] },
+    { en: 'analysis', vi: 'phân tích', pos: 'n', ipa: 'əˈnæləsɪs', example: 'Our analysis reveals key trends.' },
+    { en: 'flexible', vi: 'linh hoạt', pos: 'adj', ipa: 'ˈfleksəbl', example: 'We offer flexible working hours.' },
+    { en: 'flexibility', vi: 'sự linh hoạt', pos: 'n', ipa: 'ˌfleksəˈbɪləti', example: 'Flexibility is part of our culture.' },
+    { en: 'approximate', vi: 'xấp xỉ', pos: 'adj', ipa: 'əˈprɒksɪmət', example: 'Provide an approximate figure.' },
+    { en: 'approximately', vi: 'xấp xỉ', pos: 'adv', ipa: 'əˈprɒksɪmətli', example: 'The trip takes approximately two hours.' },
+    { en: 'eventual', vi: 'cuối cùng', pos: 'adj', ipa: 'ɪˈventʃuəl', example: 'We were hopeful of eventual success.' },
+    { en: 'eventually', vi: 'cuối cùng', pos: 'adv', ipa: 'ɪˈventʃuəli', example: 'Eventually, the issue was resolved.' },
+    { en: 'effective', vi: 'hiệu quả', pos: 'adj', ipa: 'ɪˈfektɪv', example: 'This is an effective solution.' },
+    { en: 'effectively', vi: 'một cách hiệu quả', pos: 'adv', ipa: 'ɪˈfektɪvli', example: 'The team handled it effectively.' },
+  ]);
+
+  // ---- 2026 edition ----
+  TOEIC.setPart('2026', 'part5', 'keywords', [
+    { en: 'beyond', vi: 'ngoài ra, vượt', pos: 'prep', ipa: 'bɪˈjɒnd', example: 'The cost is beyond our budget.' },
+    { en: 'throughout', vi: 'suốt', pos: 'prep', ipa: 'θruːˈaʊt', example: 'Sales rose throughout the year.' },
+    { en: 'upon', vi: 'khi, trên', pos: 'prep', ipa: 'əˈpɒn', example: 'Upon arrival, please sign in.' },
+    { en: 'provided that', vi: 'với điều kiện', pos: 'phr', ipa: 'prəˈvaɪdɪd ðæt', example: 'You can extend your stay provided that there is availability.' },
+    { en: 'just as', vi: 'ngay khi / y như', pos: 'phr', ipa: 'dʒʌst əz', example: 'Just as we were leaving, she called.' },
+    { en: 'such as', vi: 'chẳng hạn như', pos: 'phr', ipa: 'sʌtʃ əz', example: 'Tools such as a pen and notebook are allowed.' },
+    { en: 'regardless of', vi: 'bất kể', pos: 'phr', ipa: 'rɪˈɡɑːdləs əv', example: 'The event goes on regardless of weather.' },
+    { en: 'in case', vi: 'phòng khi', pos: 'phr', ipa: 'ɪn keɪs', example: 'Take an umbrella in case it rains.' },
+    { en: 'every other', vi: 'cứ hai... một lần', pos: 'phr', ipa: 'ˈevri ˈʌðə', example: 'Meetings happen every other Friday.' },
+    { en: 'whichever', vi: 'cái nào cũng', pos: 'det', ipa: 'wɪtʃˈevə', example: 'Choose whichever option suits you.' },
+  ]);
+  TOEIC.setPart('2026', 'part5', 'highFreq', [
+    { en: 'benefit', vi: 'lợi ích', pos: 'n', ipa: 'ˈbenɪfɪt', example: 'Full-time staff enjoy many benefits.' },
+    { en: 'beneficial', vi: 'có lợi', pos: 'adj', ipa: 'ˌbenɪˈfɪʃl', example: 'Exercise is beneficial to your health.' },
+    { en: 'reliable', vi: 'đáng tin cậy', pos: 'adj', ipa: 'rɪˈlaɪəbl', example: 'Our supplier is reliable.' },
+    { en: 'reliably', vi: 'một cách đáng tin', pos: 'adv', ipa: 'rɪˈlaɪəbli', example: 'The software runs reliably.' },
+    { en: 'reliability', vi: 'độ tin cậy', pos: 'n', ipa: 'rɪˌlaɪəˈbɪləti', example: 'Customers value reliability.' },
+    { en: 'expand', vi: 'mở rộng', pos: 'v', ipa: 'ɪkˈspænd', example: 'The company plans to expand.' },
+    { en: 'expansion', vi: 'sự mở rộng', pos: 'n', ipa: 'ɪkˈspænʃn', example: 'The expansion will take two years.' },
+    { en: 'expansive', vi: 'rộng lớn', pos: 'adj', ipa: 'ɪkˈspænsɪv', example: 'The lobby has expansive views.' },
+    { en: 'employ', vi: 'tuyển dụng', pos: 'v', ipa: 'ɪmˈplɔɪ', example: 'The firm employs 200 people.' },
+    { en: 'employment', vi: 'việc làm', pos: 'n', ipa: 'ɪmˈplɔɪmənt', example: 'Employment is rising nationally.' },
+    { en: 'employer', vi: 'người sử dụng lao động', pos: 'n', ipa: 'ɪmˈplɔɪə', example: 'Our employer offers remote work.' },
+    { en: 'produce', vi: 'sản xuất', pos: 'v', ipa: 'prəˈdjuːs', example: 'The factory produces bicycles.' },
+    { en: 'production', vi: 'sản xuất', pos: 'n', ipa: 'prəˈdʌkʃn', example: 'Production resumed after the holidays.' },
+    { en: 'productive', vi: 'hiệu quả', pos: 'adj', ipa: 'prəˈdʌktɪv', example: 'A productive week is ahead.' },
+    { en: 'productivity', vi: 'năng suất', pos: 'n', ipa: 'ˌprɒdʌkˈtɪvəti', example: 'Our goal is to increase productivity.' },
+    { en: 'invest', vi: 'đầu tư', pos: 'v', ipa: 'ɪnˈvest', example: 'We invest heavily in R&D.' },
+    { en: 'investment', vi: 'khoản đầu tư', pos: 'n', ipa: 'ɪnˈvestmənt', example: 'This project needs a large investment.' },
+    { en: 'investor', vi: 'nhà đầu tư', pos: 'n', ipa: 'ɪnˈvestə', example: 'Investors reacted positively.' },
+    { en: 'industry', vi: 'ngành công nghiệp', pos: 'n', ipa: 'ˈɪndəstri', example: 'The tech industry is growing.' },
+    { en: 'industrial', vi: 'thuộc công nghiệp', pos: 'adj', ipa: 'ɪnˈdʌstriəl', example: 'The industrial park is huge.' },
+    { en: 'financial', vi: 'thuộc tài chính', pos: 'adj', ipa: 'faɪˈnænʃl', example: 'Financial reports are due Friday.' },
+    { en: 'financially', vi: 'về mặt tài chính', pos: 'adv', ipa: 'faɪˈnænʃəli', example: 'The move is financially sound.' },
+    { en: 'previous', vi: 'trước đó', pos: 'adj', ipa: 'ˈpriːviəs', example: 'See the previous chapter.' },
+    { en: 'previously', vi: 'trước đây', pos: 'adv', ipa: 'ˈpriːviəsli', example: 'She previously worked at a bank.' },
+    { en: 'entirely', vi: 'hoàn toàn', pos: 'adv', ipa: 'ɪnˈtaɪəli', example: 'The process is entirely automated.' },
+  ]);
 })();
