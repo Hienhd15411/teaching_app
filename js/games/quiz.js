@@ -120,7 +120,7 @@
           <strong>${escapeHtml(w.en)}</strong> ${ipaStr}
         </div>
         <div class="fb-meaning">${I18N.t('game.meaning')}: <em>${escapeHtml(w.vi)}</em></div>`;
-      const listenBtn = `<button class="btn listen-again" data-speak="${escapeHtml(w.en)}" type="button">🔊 ${I18N.t('word.listenAgain')}</button>`;
+      const listenBtn = `<button class="btn listen-again" type="button" data-speak="${escapeHtml(w.en)}">🔊 ${I18N.t('word.listenAgain')}</button>`;
       const exampleBlock = w.example ? `<div class="fb-example">${escapeHtml(w.example)}</div>` : '';
       const synBlock = (w.syn && w.syn.length)
         ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.synonym')}</span><span class="syn-list">${w.syn.map((s) => `<span>${escapeHtml(s)}</span>`).join('')}</span></div>`
@@ -128,7 +128,7 @@
       const antBlock = (w.ant && w.ant.length)
         ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.antonym')}</span><span class="ant-list">${w.ant.map((a) => `<span>${escapeHtml(a)}</span>`).join('')}</span></div>`
         : '';
-      const nextBtn = `<button class="btn" id="nextBtn">${I18N.t('game.next')} →</button>`;
+      const nextBtn = `<button class="btn" type="button" id="nextBtn">${I18N.t('game.next')} →</button>`;
 
       feedback.className = 'answer-feedback ' + (isCorrect ? 'ok' : 'bad');
       feedback.innerHTML = bigIcon + header + wordBlock
@@ -155,12 +155,14 @@
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); advance(); }
       };
       nextEl.addEventListener('click', advance);
+      // Do NOT focus the Next button — if focus lands on it while the
+      // user's Enter/Space from the option pick is still being processed,
+      // the browser fires a synthetic click and skips the feedback.
       armTimer = setTimeout(() => {
         armed = true;
         armTimer = null;
         document.addEventListener('keydown', onKey);
-      }, 250);
-      nextEl.focus();
+      }, 400);
     }
 
     function finish() {

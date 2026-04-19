@@ -43,7 +43,7 @@
           </div>
           <div class="typing-input-row">
             <input type="text" id="typingInput" placeholder="${t('game.typingPlaceholder')}" autocomplete="off" autocorrect="off" spellcheck="false" />
-            <button class="btn" id="submitBtn">${t('game.submit')}</button>
+            <button class="btn" type="button" id="submitBtn">${t('game.submit')}</button>
           </div>
           <div class="answer-feedback" id="feedback"></div>
         </section>
@@ -54,7 +54,11 @@
       const submitBtn = container.querySelector('#submitBtn');
       input.focus();
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') check();
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          check();
+        }
       });
       submitBtn.addEventListener('click', check);
     }
@@ -102,7 +106,7 @@
           <strong>${escapeHtml(w.en)}</strong> ${ipaStr}
         </div>
         <div class="fb-meaning">${I18N.t('game.meaning')}: <em>${escapeHtml(w.vi)}</em></div>`;
-      const listenBtn = `<button class="btn listen-again" data-speak="${escapeHtml(w.en)}" type="button">🔊 ${I18N.t('word.listenAgain')}</button>`;
+      const listenBtn = `<button class="btn listen-again" type="button" data-speak="${escapeHtml(w.en)}">🔊 ${I18N.t('word.listenAgain')}</button>`;
       const exampleBlock = w.example
         ? `<div class="fb-example">${escapeHtml(w.example)}</div>` : '';
       const synBlock = (w.syn && w.syn.length)
@@ -111,7 +115,7 @@
       const antBlock = (w.ant && w.ant.length)
         ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.antonym')}</span><span class="ant-list">${w.ant.map((a) => `<span>${escapeHtml(a)}</span>`).join('')}</span></div>`
         : '';
-      const nextBtn = `<button class="btn" id="nextBtn">${I18N.t('game.next')} →</button>`;
+      const nextBtn = `<button class="btn" type="button" id="nextBtn">${I18N.t('game.next')} →</button>`;
 
       feedback.className = 'answer-feedback ' + (isCorrect ? 'ok' : 'bad');
       feedback.innerHTML = bigIcon + header + wordBlock
@@ -138,16 +142,17 @@
         if (e.key === 'Enter') { e.preventDefault(); advance(); }
       };
       nextEl.addEventListener('click', advance);
-      // Arm on next tick so the Enter press that triggered check() doesn't
-      // bubble and auto-advance. Cancel the timer if user clicks Next first,
-      // otherwise the listener would attach AFTER we've moved on and fire
-      // on the next question's Enter press.
+      // Deliberately do NOT focus nextEl. If focus lands on a button and
+      // the user's Enter key (the same one that submitted) is still pressed
+      // or auto-repeating, the browser fires a synthetic click on the
+      // focused button — advancing immediately and skipping feedback.
+      // Arm the Enter-to-advance listener only after 400ms so the original
+      // submit keystroke has fully unwound.
       armTimer = setTimeout(() => {
         armed = true;
         armTimer = null;
         document.addEventListener('keydown', onKey);
-      }, 250);
-      nextEl.focus();
+      }, 400);
     }
 
     function finish() {
