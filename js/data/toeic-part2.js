@@ -1,4 +1,130 @@
 (function () {
   'use strict';
-  // TOEIC Part 2 word data — populated in follow-up commits.
+  if (typeof TOEIC === 'undefined') return;
+
+  // Part 2 · Q & A — WH-questions, yes/no, polite responses, short replies.
+  // Curated from public TOEIC prep materials. Not ETS.
+
+  // ---- 2023 edition ----
+  TOEIC.setPart('2023', 'part2', 'keywords', [
+    { en: 'by when', vi: 'hạn chót khi nào', pos: 'phr', ipa: 'baɪ wen', example: 'By when do you need the report?' },
+    { en: 'how long', vi: 'bao lâu', pos: 'phr', ipa: 'haʊ lɒŋ', example: 'How long does the meeting last?' },
+    { en: 'how often', vi: 'bao lâu một lần', pos: 'phr', ipa: 'haʊ ˈɒfn', example: 'How often do you travel for work?' },
+    { en: 'how come', vi: 'sao lại', pos: 'phr', ipa: 'haʊ kʌm', example: 'How come the meeting was cancelled?', syn: ['why'] },
+    { en: "I'm not sure", vi: 'tôi không chắc', pos: 'phr', ipa: 'aɪm nɒt ʃʊə', example: "I'm not sure when he'll arrive." },
+    { en: 'either is fine', vi: 'cái nào cũng được', pos: 'phr', ipa: 'ˈaɪðə ɪz faɪn', example: '"Tea or coffee?" — "Either is fine."' },
+    { en: 'would rather', vi: 'thà là, muốn hơn', pos: 'phr', ipa: 'wʊd ˈrɑːðə', example: "I'd rather have the meeting tomorrow." },
+    { en: "isn't it", vi: 'phải không (tag)', pos: 'phr', ipa: 'ˈɪznt ɪt', example: "It's a lovely office, isn't it?" },
+    { en: 'available', vi: 'rảnh, có sẵn', pos: 'adj', ipa: 'əˈveɪləbl', example: 'Are you available on Friday?' },
+    { en: "let me check", vi: 'để tôi xem lại', pos: 'phr', ipa: 'let miː tʃek', example: '"When is it due?" — "Let me check."' },
+  ]);
+  TOEIC.setPart('2023', 'part2', 'highFreq', [
+    { en: 'where', vi: 'ở đâu', pos: 'adv', ipa: 'weə', example: 'Where did you leave the keys?' },
+    { en: 'when', vi: 'khi nào', pos: 'adv', ipa: 'wen', example: 'When does the store open?' },
+    { en: 'why', vi: 'tại sao', pos: 'adv', ipa: 'waɪ', example: 'Why is the office closed?' },
+    { en: 'who', vi: 'ai', pos: 'pron', ipa: 'huː', example: 'Who will lead the session?' },
+    { en: 'whose', vi: 'của ai', pos: 'pron', ipa: 'huːz', example: 'Whose laptop is on the table?' },
+    { en: 'how much', vi: 'bao nhiêu (giá)', pos: 'phr', ipa: 'haʊ mʌtʃ', example: 'How much does it cost?' },
+    { en: 'how many', vi: 'bao nhiêu (đếm)', pos: 'phr', ipa: 'haʊ ˈmeni', example: 'How many chairs do we need?' },
+    { en: 'what time', vi: 'mấy giờ', pos: 'phr', ipa: 'wɒt taɪm', example: 'What time is your flight?' },
+    { en: 'actually', vi: 'thực ra', pos: 'adv', ipa: 'ˈæktʃuəli', example: 'Actually, the event is next week.' },
+    { en: 'probably', vi: 'có lẽ', pos: 'adv', ipa: 'ˈprɒbəbli', example: 'He will probably arrive late.', syn: ['likely'] },
+    { en: 'maybe', vi: 'có thể', pos: 'adv', ipa: 'ˈmeɪbi', example: 'Maybe we should reschedule.', syn: ['perhaps'] },
+    { en: "don't know yet", vi: 'chưa biết', pos: 'phr', ipa: 'dəʊnt nəʊ jet', example: "We don't know yet who'll present." },
+    { en: 'either', vi: 'hoặc / cũng không', pos: 'det', ipa: 'ˈaɪðə', example: 'Either option works for me.' },
+    { en: 'neither', vi: 'không cái nào', pos: 'det', ipa: 'ˈnaɪðə', example: 'Neither solution is perfect.' },
+    { en: 'prefer', vi: 'thích hơn', pos: 'v', ipa: 'prɪˈfɜː', example: 'I prefer the morning slot.' },
+    { en: 'remember', vi: 'nhớ', pos: 'v', ipa: 'rɪˈmembə', example: "I don't remember where I parked." },
+    { en: 'forget', vi: 'quên', pos: 'v', ipa: 'fəˈɡet', example: 'I forgot my badge at home.' },
+    { en: 'reschedule', vi: 'đổi lịch', pos: 'v', ipa: 'ˌriːˈʃedjuːl', example: 'Can we reschedule for next Tuesday?' },
+    { en: 'postpone', vi: 'hoãn', pos: 'v', ipa: 'pəˈspəʊn', example: 'They postponed the launch.', syn: ['delay'] },
+    { en: 'confirm', vi: 'xác nhận', pos: 'v', ipa: 'kənˈfɜːm', example: 'Can you confirm the address?' },
+    { en: 'assume', vi: 'cho rằng', pos: 'v', ipa: 'əˈsjuːm', example: "I assume you've read the email." },
+    { en: 'suppose', vi: 'đoán là', pos: 'v', ipa: 'səˈpəʊz', example: 'I suppose so.' },
+    { en: 'mind', vi: 'phiền', pos: 'v', ipa: 'maɪnd', example: 'Do you mind if I sit here?' },
+    { en: 'willing', vi: 'sẵn lòng', pos: 'adj', ipa: 'ˈwɪlɪŋ', example: "I'm willing to help out this weekend." },
+    { en: 'unsure', vi: 'không chắc', pos: 'adj', ipa: 'ˌʌnˈʃʊə', example: "I'm unsure about the final cost." },
+  ]);
+
+  // ---- 2024 edition ----
+  TOEIC.setPart('2024', 'part2', 'keywords', [
+    { en: "haven't yet", vi: 'chưa xong', pos: 'phr', ipa: 'ˈhævnt jet', example: "I haven't finished the report yet." },
+    { en: 'as soon as', vi: 'ngay khi', pos: 'phr', ipa: 'əz suːn æz', example: "I'll call as soon as I arrive." },
+    { en: 'no later than', vi: 'không trễ hơn', pos: 'phr', ipa: 'nəʊ ˈleɪtə ðæn', example: 'Submit it no later than Friday.' },
+    { en: 'within', vi: 'trong vòng', pos: 'prep', ipa: 'wɪˈðɪn', example: 'Please respond within 24 hours.' },
+    { en: "that's up to you", vi: 'tuỳ bạn', pos: 'phr', ipa: 'ðæts ʌp tə juː', example: '"Where should we eat?" — "That\u2019s up to you."' },
+    { en: "why don't we", vi: 'sao chúng ta không', pos: 'phr', ipa: 'waɪ dəʊnt wiː', example: "Why don't we meet at 3?" },
+    { en: "would you mind", vi: 'bạn có phiền không', pos: 'phr', ipa: 'wʊd juː maɪnd', example: 'Would you mind turning off the light?' },
+    { en: 'actually', vi: 'thật ra là', pos: 'adv', ipa: 'ˈæktʃuəli', example: 'Actually, I already sent it.' },
+    { en: 'of course', vi: 'dĩ nhiên', pos: 'phr', ipa: 'əv kɔːs', example: '"Can I borrow this?" — "Of course."' },
+    { en: 'sure, go ahead', vi: 'cứ tự nhiên', pos: 'phr', ipa: 'ʃʊə ɡəʊ əˈhed', example: '"May I use the printer?" — "Sure, go ahead."' },
+  ]);
+  TOEIC.setPart('2024', 'part2', 'highFreq', [
+    { en: 'submit', vi: 'nộp', pos: 'v', ipa: 'səbˈmɪt', example: 'Submit your proposal by Monday.', syn: ['hand in'] },
+    { en: 'attend', vi: 'tham dự', pos: 'v', ipa: 'əˈtend', example: 'Will you attend the workshop?' },
+    { en: 'confirm', vi: 'xác nhận', pos: 'v', ipa: 'kənˈfɜːm', example: 'Please confirm your attendance.' },
+    { en: 'schedule', vi: 'xếp lịch', pos: 'v', ipa: 'ˈʃedjuːl', example: 'Can we schedule a call?' },
+    { en: 'transfer', vi: 'chuyển', pos: 'v', ipa: 'trænsˈfɜː', example: 'Please transfer the file to me.' },
+    { en: 'cancel', vi: 'huỷ', pos: 'v', ipa: 'ˈkænsl', example: 'They cancelled the appointment.' },
+    { en: 'replace', vi: 'thay thế', pos: 'v', ipa: 'rɪˈpleɪs', example: 'We need to replace the printer.' },
+    { en: 'invoice', vi: 'hoá đơn', pos: 'n', ipa: 'ˈɪnvɔɪs', example: 'Did you receive the invoice?' },
+    { en: 'attachment', vi: 'tệp đính kèm', pos: 'n', ipa: 'əˈtætʃmənt', example: 'The attachment seems corrupted.' },
+    { en: 'reception', vi: 'quầy lễ tân', pos: 'n', ipa: 'rɪˈsepʃn', example: 'Please sign in at reception.' },
+    { en: 'lobby', vi: 'sảnh', pos: 'n', ipa: 'ˈlɒbi', example: "I'll meet you in the lobby." },
+    { en: 'entrance', vi: 'lối vào', pos: 'n', ipa: 'ˈentrəns', example: 'Use the side entrance.' },
+    { en: 'shortly', vi: 'sắp, chốc nữa', pos: 'adv', ipa: 'ˈʃɔːtli', example: "I'll be with you shortly.", syn: ['soon'] },
+    { en: 'immediately', vi: 'ngay lập tức', pos: 'adv', ipa: 'ɪˈmiːdiətli', example: "I'll send it immediately." },
+    { en: 'ever', vi: 'bao giờ', pos: 'adv', ipa: 'ˈevə', example: 'Have you ever been to Tokyo?' },
+    { en: 'never', vi: 'chưa bao giờ', pos: 'adv', ipa: 'ˈnevə', example: "I've never tried that restaurant." },
+    { en: 'already', vi: 'rồi, đã', pos: 'adv', ipa: 'ɔːlˈredi', example: "I've already finished." },
+    { en: 'yet', vi: 'chưa', pos: 'adv', ipa: 'jet', example: 'They haven\u2019t replied yet.' },
+    { en: 'often', vi: 'thường xuyên', pos: 'adv', ipa: 'ˈɒfn', example: 'Do you often work late?' },
+    { en: 'rarely', vi: 'hiếm khi', pos: 'adv', ipa: 'ˈreəli', example: 'We rarely travel in January.', ant: ['often'] },
+    { en: 'occasionally', vi: 'thỉnh thoảng', pos: 'adv', ipa: 'əˈkeɪʒnəli', example: 'I occasionally work from home.' },
+    { en: 'tomorrow', vi: 'ngày mai', pos: 'adv', ipa: 'təˈmɒrəʊ', example: "I'll call you tomorrow morning." },
+    { en: 'tonight', vi: 'tối nay', pos: 'adv', ipa: 'təˈnaɪt', example: 'Are you free tonight?' },
+    { en: 'later', vi: 'lát nữa', pos: 'adv', ipa: 'ˈleɪtə', example: "I'll get back to you later." },
+    { en: 'certainly', vi: 'chắc chắn rồi', pos: 'adv', ipa: 'ˈsɜːtnli', example: 'Certainly, sir.', syn: ['of course'] },
+  ]);
+
+  // ---- 2026 edition ----
+  TOEIC.setPart('2026', 'part2', 'keywords', [
+    { en: 'would you like', vi: 'bạn có muốn', pos: 'phr', ipa: 'wʊd juː laɪk', example: 'Would you like some coffee?' },
+    { en: 'could you', vi: 'bạn có thể', pos: 'phr', ipa: 'kʊd juː', example: 'Could you send me the link?' },
+    { en: "I'd appreciate", vi: 'tôi cảm kích', pos: 'phr', ipa: 'aɪd əˈpriːʃieɪt', example: "I'd appreciate your help on this." },
+    { en: 'on second thought', vi: 'nghĩ lại thì', pos: 'phr', ipa: 'ɒn ˈsekənd θɔːt', example: 'On second thought, let\u2019s wait.' },
+    { en: "in a minute", vi: 'một lát nữa', pos: 'phr', ipa: 'ɪn ə ˈmɪnɪt', example: "I'll be right there in a minute." },
+    { en: 'right away', vi: 'ngay', pos: 'phr', ipa: 'raɪt əˈweɪ', example: "I'll take care of it right away." },
+    { en: "that's news to me", vi: 'tin mới với tôi', pos: 'phr', ipa: 'ðæts njuːz tə miː', example: 'She\u2019s leaving? That\u2019s news to me.' },
+    { en: 'something like that', vi: 'đại loại thế', pos: 'phr', ipa: 'ˈsʌmθɪŋ laɪk ðæt', example: 'We\u2019ll hire a few interns, something like that.' },
+    { en: 'as far as I know', vi: 'theo tôi biết', pos: 'phr', ipa: 'əz fɑːr əz aɪ nəʊ', example: 'As far as I know, the deal is finalised.' },
+    { en: "I'll let you know", vi: 'tôi sẽ báo bạn', pos: 'phr', ipa: 'aɪl let juː nəʊ', example: "I'll let you know once I hear back." },
+  ]);
+  TOEIC.setPart('2026', 'part2', 'highFreq', [
+    { en: 'approve', vi: 'phê duyệt', pos: 'v', ipa: 'əˈpruːv', example: 'Has the manager approved the budget?' },
+    { en: 'review', vi: 'xem lại', pos: 'v', ipa: 'rɪˈvjuː', example: "I'll review the draft tonight." },
+    { en: 'forward', vi: 'chuyển tiếp', pos: 'v', ipa: 'ˈfɔːwəd', example: 'Forward the email to the team.' },
+    { en: 'reply', vi: 'trả lời', pos: 'v', ipa: 'rɪˈplaɪ', example: "I'll reply after lunch." },
+    { en: 'respond', vi: 'phản hồi', pos: 'v', ipa: 'rɪˈspɒnd', example: 'She responded right away.' },
+    { en: 'contact', vi: 'liên hệ', pos: 'v', ipa: 'ˈkɒntækt', example: 'Please contact HR for details.' },
+    { en: 'reach', vi: 'liên lạc được', pos: 'v', ipa: 'riːtʃ', example: 'I couldn\u2019t reach him on the phone.' },
+    { en: 'recommend', vi: 'gợi ý', pos: 'v', ipa: 'ˌrekəˈmend', example: 'Can you recommend a good supplier?' },
+    { en: 'figure out', vi: 'tìm ra', pos: 'phr', ipa: 'ˈfɪɡə aʊt', example: "We're trying to figure out the problem." },
+    { en: 'bring in', vi: 'đưa vào, mời đến', pos: 'phr', ipa: 'brɪŋ ɪn', example: 'They brought in a consultant.' },
+    { en: 'drop off', vi: 'đưa (đến nơi)', pos: 'phr', ipa: 'drɒp ɒf', example: "I'll drop off the package on the way." },
+    { en: 'pick up', vi: 'đón, lấy lên', pos: 'phr', ipa: 'pɪk ʌp', example: 'Can you pick up the documents?' },
+    { en: 'look into', vi: 'điều tra, xem xét', pos: 'phr', ipa: 'lʊk ˈɪntuː', example: "I'll look into it this afternoon." },
+    { en: 'look over', vi: 'xem qua', pos: 'phr', ipa: 'lʊk ˈəʊvə', example: 'Please look over the contract.' },
+    { en: 'run late', vi: 'bị trễ', pos: 'phr', ipa: 'rʌn leɪt', example: "I'm running late — start without me." },
+    { en: 'head out', vi: 'đi ra ngoài', pos: 'phr', ipa: 'hed aʊt', example: 'We\u2019re heading out for lunch.' },
+    { en: 'wrap up', vi: 'kết thúc', pos: 'phr', ipa: 'ræp ʌp', example: 'Let\u2019s wrap up the meeting.' },
+    { en: 'hold off', vi: 'hoãn lại', pos: 'phr', ipa: 'həʊld ɒf', example: 'Let\u2019s hold off on that decision.' },
+    { en: 'fix', vi: 'sửa', pos: 'v', ipa: 'fɪks', example: 'Can you fix the copier?' },
+    { en: 'break', vi: 'hỏng', pos: 'v', ipa: 'breɪk', example: 'The machine broke again.' },
+    { en: 'available', vi: 'có sẵn', pos: 'adj', ipa: 'əˈveɪləbl', example: 'Is the conference room available?' },
+    { en: 'busy', vi: 'bận', pos: 'adj', ipa: 'ˈbɪzi', example: 'Sorry, I\u2019m busy this afternoon.' },
+    { en: 'late', vi: 'muộn', pos: 'adj', ipa: 'leɪt', example: 'The train was late again.' },
+    { en: 'early', vi: 'sớm', pos: 'adj', ipa: 'ˈɜːli', example: 'The delivery arrived early.' },
+    { en: 'ready', vi: 'sẵn sàng', pos: 'adj', ipa: 'ˈredi', example: 'Is the report ready?' },
+  ]);
 })();
