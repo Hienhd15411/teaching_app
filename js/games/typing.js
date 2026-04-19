@@ -125,16 +125,20 @@
       }
 
       const nextEl = feedback.querySelector('#nextBtn');
+      let armed = false;
       const advance = () => {
         document.removeEventListener('keydown', onKey);
         idx += 1;
         render();
       };
       const onKey = (e) => {
+        if (!armed) return;
         if (e.key === 'Enter') { e.preventDefault(); advance(); }
       };
       nextEl.addEventListener('click', advance);
-      document.addEventListener('keydown', onKey);
+      // Arm on next tick so the Enter press that triggered check()
+      // doesn't bubble and auto-advance immediately.
+      setTimeout(() => { armed = true; document.addEventListener('keydown', onKey); }, 250);
       nextEl.focus();
     }
 

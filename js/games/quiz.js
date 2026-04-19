@@ -65,6 +65,7 @@
             <div class="sub">${sub}</div>
           </div>
           <div class="quiz-options">${optHtml}</div>
+          <div class="typing-feedback" id="quizFeedback"></div>
         </section>
       `;
       locked = false;
@@ -93,17 +94,67 @@
         wrong += 1;
         combo = 0;
         btn.classList.add('wrong');
-        // show correct one too
         container.querySelectorAll('.quiz-option').forEach((b) => {
           if (b.getAttribute('data-en') === q.word.en) b.classList.add('correct');
         });
       }
       container.querySelectorAll('.quiz-option').forEach((b) => (b.disabled = true));
 
-      setTimeout(() => {
+      showFeedback(q, isCorrect);
+    }
+
+    function showFeedback(q, isCorrect) {
+      const w = q.word;
+      const feedback = container.querySelector('#quizFeedback');
+      if (!feedback) return;
+
+      const ipaStr = w.ipa ? `<span class="ipa">/${escapeHtml(w.ipa)}/</span>` : '';
+      const bigIcon = isCorrect
+        ? '<div class="fb-big-icon ok">✓</div>'
+        : '<div class="fb-big-icon bad">✗</div>';
+      const header = isCorrect
+        ? `<div class="fb-status ok">${I18N.t('game.typingCorrect')}</div>`
+        : `<div class="fb-status bad">${I18N.t('game.typingWrong')}</div>`;
+      const wordBlock = `
+        <div class="fb-word">
+          <strong>${escapeHtml(w.en)}</strong> ${ipaStr}
+        </div>
+        <div class="fb-meaning">${I18N.t('game.meaning')}: <em>${escapeHtml(w.vi)}</em></div>`;
+      const listenBtn = `<button class="btn listen-again" data-speak="${escapeHtml(w.en)}" type="button">🔊 ${I18N.t('word.listenAgain')}</button>`;
+      const exampleBlock = w.example ? `<div class="fb-example">${escapeHtml(w.example)}</div>` : '';
+      const synBlock = (w.syn && w.syn.length)
+        ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.synonym')}</span><span class="syn-list">${w.syn.map((s) => `<span>${escapeHtml(s)}</span>`).join('')}</span></div>`
+        : '';
+      const antBlock = (w.ant && w.ant.length)
+        ? `<div class="fb-row"><span class="fb-label">${I18N.t('word.antonym')}</span><span class="ant-list">${w.ant.map((a) => `<span>${escapeHtml(a)}</span>`).join('')}</span></div>`
+        : '';
+      const nextBtn = `<button class="btn" id="nextBtn">${I18N.t('game.next')} →</button>`;
+
+      feedback.className = 'typing-feedback ' + (isCorrect ? 'ok' : 'bad');
+      feedback.innerHTML = bigIcon + header + wordBlock
+        + `<div class="fb-actions-row">${listenBtn}</div>`
+        + exampleBlock + synBlock + antBlock
+        + `<div class="fb-actions">${nextBtn}</div>`;
+
+      if (typeof Pronunciation !== 'undefined') {
+        Pronunciation.bindSpeakers(feedback);
+        Pronunciation.speak(w.en);
+      }
+
+      const nextEl = feedback.querySelector('#nextBtn');
+      let armed = false;
+      const advance = () => {
+        document.removeEventListener('keydown', onKey);
         idx += 1;
         render();
-      }, isCorrect ? 600 : 1100);
+      };
+      const onKey = (e) => {
+        if (!armed) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); advance(); }
+      };
+      nextEl.addEventListener('click', advance);
+      setTimeout(() => { armed = true; document.addEventListener('keydown', onKey); }, 250);
+      nextEl.focus();
     }
 
     function finish() {

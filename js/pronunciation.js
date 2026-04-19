@@ -5,58 +5,54 @@
     && 'speechSynthesis' in window
     && typeof window.SpeechSynthesisUtterance === 'function';
 
-  let cachedVoice = null;
+  // Turn on to log every speak() call to the console (for diagnosing Chrome silence).
+  const DEBUG = true;
 
-  function pickVoice() {
-    if (!SUPPORTED) return null;
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices || voices.length === 0) return null;
-    // Strongly prefer a LOCAL English voice — Chrome-on-Mac sometimes
-    // picks "Google US English" (cloud) which silently fails to speak
-    // when the remote fetch is blocked or slow.
-    const localEn = voices.filter(
-      (v) => v.localService && (v.lang || '').toLowerCase().startsWith('en')
-    );
-    return (
-      localEn.find((v) => v.lang === 'en-US') ||
-      localEn.find((v) => v.lang === 'en-GB') ||
-      localEn[0] ||
-      voices.find((v) => v.lang === 'en-US') ||
-      voices.find((v) => (v.lang || '').toLowerCase().startsWith('en')) ||
-      voices[0]
-    );
+  function getVoices() {
+    if (!SUPPORTED) return [];
+    try { return window.speechSynthesis.getVoices() || []; }
+    catch (e) { return []; }
   }
 
-  function refreshVoice() {
-    cachedVoice = pickVoice();
+  function pickEnglishVoice() {
+    const voices = getVoices();
+    if (!voices.length) return null;
+    // Strict local-first. Chrome on Mac defaults to "Google US English" which is
+    // a cloud voice — if Chrome can't reach Google's TTS server, the utterance
+    // is silently dropped. Safari picks a local voice (Samantha) by default.
+    return (
+      voices.find((v) => v.localService && v.lang === 'en-US') ||
+      voices.find((v) => v.localService && v.lang === 'en-GB') ||
+      voices.find((v) => v.localService && (v.lang || '').toLowerCase().startsWith('en')) ||
+      voices.find((v) => v.lang === 'en-US' && !/google/i.test(v.name || '')) ||
+      voices.find((v) => (v.lang || '').toLowerCase().startsWith('en') && !/google/i.test(v.name || '')) ||
+      voices.find((v) => (v.lang || '').toLowerCase().startsWith('en')) ||
+      null
+    );
   }
 
   if (SUPPORTED) {
-    // Prime voice list; voices often load async on Chrome.
-    try { window.speechSynthesis.getVoices(); } catch (e) {}
-    refreshVoice();
+    try { getVoices(); } catch (e) {}
+    const ping = () => { /* warms the voice list */ getVoices(); };
     if (typeof window.speechSynthesis.addEventListener === 'function') {
-      window.speechSynthesis.addEventListener('voiceschanged', refreshVoice);
+      window.speechSynthesis.addEventListener('voiceschanged', ping);
     } else {
-      window.speechSynthesis.onvoiceschanged = refreshVoice;
+      window.speechSynthesis.onvoiceschanged = ping;
     }
   }
 
   function speak(text, opts, btn) {
     if (!SUPPORTED || !text) return false;
+
     try {
-      // Chrome quirk: calling cancel() when nothing is speaking can leave
-      // the engine in a broken state where subsequent speak() is silent.
-      // Only cancel when there's actually something to cancel.
       if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
         window.speechSynthesis.cancel();
       }
 
-      if (!cachedVoice) refreshVoice();
-
       const utter = new SpeechSynthesisUtterance(String(text));
-      if (cachedVoice) utter.voice = cachedVoice;
-      utter.lang = (cachedVoice && cachedVoice.lang) || 'en-US';
+      const voice = pickEnglishVoice();
+      if (voice) utter.voice = voice;
+      utter.lang = (voice && voice.lang) || 'en-US';
       utter.rate = (opts && opts.rate) || 0.95;
       utter.pitch = (opts && opts.pitch) || 1;
       utter.volume = 1;
@@ -65,12 +61,24 @@
         btn.classList.add('speaking');
         const clear = () => btn.classList.remove('speaking');
         utter.onend = clear;
-        utter.onerror = clear;
+        utter.onerror = (e) => {
+          clear();
+          if (DEBUG) console.warn('[Pronunciation] utterance error', e);
+        };
+      }
+
+      if (DEBUG) {
+        console.log('[Pronunciation] speak', {
+          text: String(text),
+          voice: voice ? voice.name + ' / ' + voice.lang + (voice.localService ? ' (local)' : ' (cloud)') : '(no voice set — default)',
+          totalVoices: getVoices().length,
+        });
       }
 
       window.speechSynthesis.speak(utter);
       return true;
     } catch (e) {
+      if (DEBUG) console.warn('[Pronunciation] speak() threw', e);
       return false;
     }
   }
