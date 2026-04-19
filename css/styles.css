@@ -366,6 +366,20 @@ input[type="text"]:focus { border-color: var(--primary); }
 .speak-btn:hover { background: var(--border); }
 .speak-btn:active { transform: scale(0.92); }
 .speak-btn.big { padding: 6px 12px; font-size: 16px; }
+.speak-btn.speaking {
+  background: var(--primary);
+  color: white;
+  animation: speaker-pulse 0.8s ease-in-out infinite;
+}
+@keyframes speaker-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+}
+.btn.listen-again.speaking {
+  background: var(--primary);
+  color: white;
+  animation: speaker-pulse 0.8s ease-in-out infinite;
+}
 
 .word-extras {
   margin-top: 12px;
