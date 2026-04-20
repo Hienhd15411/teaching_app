@@ -664,6 +664,95 @@ input[type="text"]:focus { border-color: var(--primary); }
   color: var(--text-muted); font-size: 13px; margin-top: 6px;
 }
 
+/* ===== Speaking mode ===== */
+.speak-card {
+  background: var(--bg-soft);
+  border-radius: var(--radius);
+  padding: 28px 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.speak-vi {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.speak-ipa {
+  font-family: "Charis SIL", "Doulos SIL", "Gentium Plus", Georgia, serif;
+  color: var(--text-muted);
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+.speak-en {
+  font-size: 34px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.speak-pos {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.mic-stage {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.mic-btn {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 18px 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+  transition: transform 0.1s;
+}
+.mic-btn:hover { transform: translateY(-2px); }
+.mic-btn:active { transform: scale(0.97); }
+.mic-btn .mic-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.mic-btn.listening {
+  background: linear-gradient(135deg, var(--danger), #ec4899);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  50% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+}
+
+.answer-feedback.close {
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+.answer-feedback .fb-big-icon.close {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+}
+.answer-feedback .fb-status.close { color: var(--warning); }
+.answer-feedback .fb-heard {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 10px 0;
+}
+.answer-feedback .fb-heard em {
+  color: var(--text);
+  font-style: italic;
+  font-weight: 600;
+}
+
 /* Matching */
 .matching-grid {
   display: grid;

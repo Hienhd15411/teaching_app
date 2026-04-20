@@ -179,6 +179,11 @@
             <div class="title">${t('mode.matching')}</div>
             <div class="desc">${t('mode.matchingDesc')}</div>
           </div>
+          <div class="mode-card" data-mode="speaking">
+            <div class="icon">🎤</div>
+            <div class="title">${t('mode.speaking')}</div>
+            <div class="desc">${t('mode.speakingDesc')}</div>
+          </div>
         </div>
 
         ${reviewBtn}
@@ -254,6 +259,7 @@
     if (mode === 'quiz') return QuizGame;
     if (mode === 'typing') return TypingGame;
     if (mode === 'matching') return MatchingGame;
+    if (mode === 'speaking') return SpeakingGame;
     return null;
   }
 
@@ -647,6 +653,10 @@
           <div class="mode-card" data-mode="matching">
             <div class="icon">🔗</div><div class="title">${t('mode.matching')}</div>
             <div class="desc">${t('mode.matchingDesc')}</div>
+          </div>
+          <div class="mode-card" data-mode="speaking">
+            <div class="icon">🎤</div><div class="title">${t('mode.speaking')}</div>
+            <div class="desc">${t('mode.speakingDesc')}</div>
           </div>
         </div>
 
