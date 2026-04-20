@@ -8,6 +8,44 @@
   // Turn on to log every speak() call to the console (for diagnosing Chrome silence).
   const DEBUG = true;
 
+  // Gender heuristic — Web Speech API doesn't expose voice gender, so we
+  // match on common voice names across macOS, Windows, Android, and Chrome's
+  // bundled voices.
+  const FEMALE_HINTS = [
+    'samantha', 'allison', 'ava', 'karen', 'moira', 'tessa', 'victoria',
+    'susan', 'kathy', 'vicki', 'princess', 'female', 'zira', 'hazel',
+    'heather', 'catherine', 'audrey', 'amelie', 'anna', 'serena', 'fiona',
+    'veena', 'kate', 'siri (female', 'eva', 'helena', 'paulina',
+  ];
+  const MALE_HINTS = [
+    'alex', 'daniel', 'fred', 'tom', 'aaron', 'reed', 'rishi', 'mark',
+    'david', 'james', 'albert', 'bruce', 'oliver', 'george', 'arthur',
+    'male', 'lee', 'ralph', 'magnus', 'oskar', 'siri (male',
+  ];
+
+  function detectGender(voice) {
+    const name = (voice && voice.name || '').toLowerCase();
+    if (!name) return null;
+    if (FEMALE_HINTS.some((n) => name.includes(n))) return 'female';
+    if (MALE_HINTS.some((n) => name.includes(n))) return 'male';
+    return null;
+  }
+
+  // Persisted gender preference: 'auto' | 'female' | 'male'.
+  const GENDER_KEY = 'vlt_voice_gender';
+  let preferredGender = 'auto';
+  try {
+    const saved = localStorage.getItem(GENDER_KEY);
+    if (saved === 'female' || saved === 'male' || saved === 'auto') preferredGender = saved;
+  } catch (e) {}
+
+  function getGender() { return preferredGender; }
+  function setGender(g) {
+    if (g !== 'auto' && g !== 'female' && g !== 'male') return;
+    preferredGender = g;
+    try { localStorage.setItem(GENDER_KEY, g); } catch (e) {}
+  }
+
   function getVoices() {
     if (!SUPPORTED) return [];
     try { return window.speechSynthesis.getVoices() || []; }
@@ -17,18 +55,47 @@
   function pickEnglishVoice() {
     const voices = getVoices();
     if (!voices.length) return null;
-    // Strict local-first. Chrome on Mac defaults to "Google US English" which is
-    // a cloud voice — if Chrome can't reach Google's TTS server, the utterance
-    // is silently dropped. Safari picks a local voice (Samantha) by default.
+    const enLocal = voices.filter((v) => v.localService && (v.lang || '').toLowerCase().startsWith('en'));
+    const matchGender = (list) => {
+      if (preferredGender === 'auto') return null;
+      const g = list.filter((v) => detectGender(v) === preferredGender);
+      if (!g.length) return null;
+      return g.find((v) => v.lang === 'en-US') || g.find((v) => v.lang === 'en-GB') || g[0];
+    };
+
+    // 1. Try gender-matched local English voice first.
+    const genderedLocal = matchGender(enLocal);
+    if (genderedLocal) return genderedLocal;
+
+    // 2. Fall back to any local English voice.
+    const anyLocal =
+      enLocal.find((v) => v.lang === 'en-US') ||
+      enLocal.find((v) => v.lang === 'en-GB') ||
+      enLocal[0];
+    if (anyLocal) return anyLocal;
+
+    // 3. Last resort — non-local voices, prefer en-US, exclude flaky cloud voices when possible.
+    const anyEn = voices.filter((v) => (v.lang || '').toLowerCase().startsWith('en'));
+    const genderedAny = matchGender(anyEn);
+    if (genderedAny) return genderedAny;
     return (
-      voices.find((v) => v.localService && v.lang === 'en-US') ||
-      voices.find((v) => v.localService && v.lang === 'en-GB') ||
-      voices.find((v) => v.localService && (v.lang || '').toLowerCase().startsWith('en')) ||
-      voices.find((v) => v.lang === 'en-US' && !/google/i.test(v.name || '')) ||
-      voices.find((v) => (v.lang || '').toLowerCase().startsWith('en') && !/google/i.test(v.name || '')) ||
-      voices.find((v) => (v.lang || '').toLowerCase().startsWith('en')) ||
+      anyEn.find((v) => v.lang === 'en-US' && !/google/i.test(v.name || '')) ||
+      anyEn.find((v) => !/google/i.test(v.name || '')) ||
+      anyEn[0] ||
       null
     );
+  }
+
+  // Expose voice list grouped by detected gender so the UI can show counts.
+  function listEnglishVoicesByGender() {
+    const voices = getVoices();
+    const out = { auto: voices.length, female: 0, male: 0, unknown: 0 };
+    voices.forEach((v) => {
+      if (!(v.lang || '').toLowerCase().startsWith('en')) return;
+      const g = detectGender(v) || 'unknown';
+      out[g] = (out[g] || 0) + 1;
+    });
+    return out;
   }
 
   if (SUPPORTED) {
@@ -101,5 +168,10 @@
     });
   }
 
-  global.Pronunciation = { speak, cancel, bindSpeakers, supported: SUPPORTED };
+  global.Pronunciation = {
+    speak, cancel, bindSpeakers,
+    supported: SUPPORTED,
+    getGender, setGender,
+    listEnglishVoicesByGender,
+  };
 })(window);

@@ -5,6 +5,7 @@
   const navEl = document.getElementById('mainNav');
   const chipEl = document.getElementById('profileChip');
   const langBtn = document.getElementById('langToggle');
+  const voiceBtn = document.getElementById('voiceToggle');
   const switchBtn = document.getElementById('switchProfileBtn');
 
   let currentView = null;
@@ -716,8 +717,35 @@
 
     langBtn.addEventListener('click', () => {
       I18N.toggle();
+      syncVoiceLabel();
       if (currentView) navigate(currentView);
     });
+
+    function syncVoiceLabel() {
+      if (!voiceBtn || typeof Pronunciation === 'undefined') return;
+      const g = Pronunciation.getGender();
+      const label = voiceBtn.querySelector('#voiceLabel');
+      const map = { auto: '🤖', female: '👩', male: '👨' };
+      const titleMap = { auto: I18N.t('voice.auto'), female: I18N.t('voice.female'), male: I18N.t('voice.male') };
+      if (label) label.textContent = map[g] || '🤖';
+      voiceBtn.title = titleMap[g] || '';
+    }
+    syncVoiceLabel();
+
+    if (voiceBtn) {
+      voiceBtn.addEventListener('click', () => {
+        if (typeof Pronunciation === 'undefined') return;
+        const order = ['auto', 'female', 'male'];
+        const cur = Pronunciation.getGender();
+        const next = order[(order.indexOf(cur) + 1) % order.length];
+        Pronunciation.setGender(next);
+        syncVoiceLabel();
+        const labels = { auto: I18N.t('voice.auto'), female: I18N.t('voice.female'), male: I18N.t('voice.male') };
+        toast(I18N.t('voice.changedTo') + ' ' + labels[next]);
+        // Sample the new voice immediately so the user hears the change.
+        Pronunciation.speak('hello', null, voiceBtn);
+      });
+    }
 
     switchBtn.addEventListener('click', () => {
       Storage.setActiveProfile(null);
