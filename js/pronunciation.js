@@ -56,28 +56,49 @@
     const voices = getVoices();
     if (!voices.length) return null;
     const enLocal = voices.filter((v) => v.localService && (v.lang || '').toLowerCase().startsWith('en'));
-    const matchGender = (list) => {
-      if (preferredGender === 'auto') return null;
-      const g = list.filter((v) => detectGender(v) === preferredGender);
-      if (!g.length) return null;
-      return g.find((v) => v.lang === 'en-US') || g.find((v) => v.lang === 'en-GB') || g[0];
+
+    // Score a voice: higher = better. We tilt toward natural-sounding
+    // modern voices and away from the robotic ones (Alex, Fred, Ralph,
+    // Zarvox, Bahh, Whisper, Trinoids, etc.).
+    const scoreVoice = (v) => {
+      let s = 0;
+      const n = (v.name || '').toLowerCase();
+      if (/enhanced|premium|natural|neural/.test(n)) s += 20;
+      if (v.lang === 'en-US') s += 4;
+      else if (v.lang === 'en-GB') s += 3;
+      else if ((v.lang || '').startsWith('en')) s += 1;
+      // Newer, more natural voices
+      if (/\b(tom|daniel|oliver|rishi|aaron|arthur|albert|ava|samantha|karen|victoria|tessa|susan|moira|siri)\b/.test(n)) s += 5;
+      // Older / robotic voices to avoid
+      if (/\b(alex|fred|bruce|junior|ralph|whisper|bahh|trinoids|zarvox|cellos|hysterical|bells|organ|boing|bubbles|deranged|good news|bad news|pipe organ|kathy|reed|princess)\b/.test(n)) s -= 15;
+      return s;
     };
 
-    // 1. Try gender-matched local English voice first.
-    const genderedLocal = matchGender(enLocal);
-    if (genderedLocal) return genderedLocal;
+    const sortedGendered = (list, gender) => {
+      const g = list.filter((v) => detectGender(v) === gender);
+      if (!g.length) return null;
+      g.sort((a, b) => scoreVoice(b) - scoreVoice(a));
+      return g[0];
+    };
 
-    // 2. Fall back to any local English voice.
-    const anyLocal =
-      enLocal.find((v) => v.lang === 'en-US') ||
-      enLocal.find((v) => v.lang === 'en-GB') ||
-      enLocal[0];
-    if (anyLocal) return anyLocal;
+    // 1. Gender-matched, best-scored local voice.
+    if (preferredGender !== 'auto') {
+      const matched = sortedGendered(enLocal, preferredGender);
+      if (matched) return matched;
+    }
 
-    // 3. Last resort — non-local voices, prefer en-US, exclude flaky cloud voices when possible.
+    // 2. Best-scored local English voice.
+    if (enLocal.length) {
+      const sorted = enLocal.slice().sort((a, b) => scoreVoice(b) - scoreVoice(a));
+      if (sorted[0]) return sorted[0];
+    }
+
+    // 3. Last resort — cloud voices (exclude Google on Chrome/Mac which tends to silently fail).
     const anyEn = voices.filter((v) => (v.lang || '').toLowerCase().startsWith('en'));
-    const genderedAny = matchGender(anyEn);
-    if (genderedAny) return genderedAny;
+    if (preferredGender !== 'auto') {
+      const matched = sortedGendered(anyEn, preferredGender);
+      if (matched && !/google/i.test(matched.name || '')) return matched;
+    }
     return (
       anyEn.find((v) => v.lang === 'en-US' && !/google/i.test(v.name || '')) ||
       anyEn.find((v) => !/google/i.test(v.name || '')) ||
