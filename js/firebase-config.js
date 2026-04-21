@@ -52,6 +52,6 @@
 
   // Emails that get access to the Class dashboard. Usually just you.
   global.TEACHER_EMAILS = [
-    // 'you@example.com',
+    // 'lemytrinh1801@example.com',
   ];
 })(window);
