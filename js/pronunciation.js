@@ -33,10 +33,13 @@
 
   // Persisted gender preference: 'auto' | 'female' | 'male'.
   const GENDER_KEY = 'vlt_voice_gender';
+  const VOICE_NAME_KEY = 'vlt_voice_name';
   let preferredGender = 'auto';
+  let preferredVoiceName = null;
   try {
     const saved = localStorage.getItem(GENDER_KEY);
     if (saved === 'female' || saved === 'male' || saved === 'auto') preferredGender = saved;
+    preferredVoiceName = localStorage.getItem(VOICE_NAME_KEY) || null;
   } catch (e) {}
 
   function getGender() { return preferredGender; }
@@ -44,6 +47,29 @@
     if (g !== 'auto' && g !== 'female' && g !== 'male') return;
     preferredGender = g;
     try { localStorage.setItem(GENDER_KEY, g); } catch (e) {}
+  }
+
+  function getVoiceName() { return preferredVoiceName; }
+  function setVoiceName(name) {
+    preferredVoiceName = name || null;
+    try {
+      if (name) localStorage.setItem(VOICE_NAME_KEY, name);
+      else localStorage.removeItem(VOICE_NAME_KEY);
+    } catch (e) {}
+  }
+
+  // All English voices, decorated with metadata for the picker UI.
+  function listEnglishVoices() {
+    return getVoices()
+      .filter((v) => (v.lang || '').toLowerCase().startsWith('en'))
+      .map((v) => ({
+        name: v.name,
+        lang: v.lang,
+        localService: v.localService,
+        gender: detectGender(v),
+        enhanced: /enhanced|premium|natural|neural/i.test(v.name || ''),
+        lowQuality: /\b(alex|fred|bruce|junior|ralph|whisper|bahh|trinoids|zarvox|cellos|hysterical|bells|organ|boing|bubbles|deranged|pipe organ)\b/i.test(v.name || ''),
+      }));
   }
 
   function getVoices() {
@@ -55,6 +81,13 @@
   function pickEnglishVoice() {
     const voices = getVoices();
     if (!voices.length) return null;
+
+    // 0. Explicit user pick wins over everything else.
+    if (preferredVoiceName) {
+      const pick = voices.find((v) => v.name === preferredVoiceName);
+      if (pick) return pick;
+    }
+
     const enLocal = voices.filter((v) => v.localService && (v.lang || '').toLowerCase().startsWith('en'));
 
     // Score a voice: higher = better. We tilt toward natural-sounding
@@ -211,7 +244,8 @@
     speak, cancel, bindSpeakers,
     supported: SUPPORTED,
     getGender, setGender,
-    listEnglishVoicesByGender,
+    getVoiceName, setVoiceName,
+    listEnglishVoices, listEnglishVoicesByGender,
     getCurrentVoiceInfo,
   };
 })(window);

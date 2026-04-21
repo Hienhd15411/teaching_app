@@ -749,31 +749,111 @@
     function syncVoiceLabel() {
       if (!voiceBtn || typeof Pronunciation === 'undefined') return;
       const g = Pronunciation.getGender();
+      const explicit = Pronunciation.getVoiceName();
       const label = voiceBtn.querySelector('#voiceLabel');
       const map = { auto: '🤖', female: '👩', male: '👨' };
-      const titleMap = { auto: I18N.t('voice.auto'), female: I18N.t('voice.female'), male: I18N.t('voice.male') };
-      if (label) label.textContent = map[g] || '🤖';
-      voiceBtn.title = titleMap[g] || '';
+      if (label) label.textContent = explicit ? '🔊' : (map[g] || '🤖');
+      const info = Pronunciation.getCurrentVoiceInfo();
+      voiceBtn.title = info && info.name ? info.name : I18N.t('voice.auto');
     }
     syncVoiceLabel();
 
-    if (voiceBtn) {
-      voiceBtn.addEventListener('click', () => {
-        if (typeof Pronunciation === 'undefined') return;
-        const order = ['auto', 'female', 'male'];
-        const cur = Pronunciation.getGender();
-        const next = order[(order.indexOf(cur) + 1) % order.length];
-        Pronunciation.setGender(next);
-        syncVoiceLabel();
-        const labels = { auto: I18N.t('voice.auto'), female: I18N.t('voice.female'), male: I18N.t('voice.male') };
-        const info = Pronunciation.getCurrentVoiceInfo();
-        let msg = I18N.t('voice.changedTo') + ' ' + labels[next];
-        if (info && info.name) msg += ' — ' + info.name;
-        if (info && info.lowQuality) msg += ' ' + I18N.t('voice.oldHint');
-        toast(msg);
-        // Sample the new voice immediately so the user hears the change.
-        Pronunciation.speak('hello', null, voiceBtn);
+    function openVoicePicker() {
+      if (typeof Pronunciation === 'undefined') return;
+      const voices = Pronunciation.listEnglishVoices();
+      const curGender = Pronunciation.getGender();
+      const curName = Pronunciation.getVoiceName();
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      const genderRow = (gender, label, emoji) => {
+        const isActive = !curName && curGender === gender;
+        return `<button class="voice-pill ${isActive ? 'active' : ''}" data-gender="${gender}">${emoji} ${escapeHtml(label)}</button>`;
+      };
+      const voiceRow = (v) => {
+        const isActive = curName === v.name;
+        const genderIcon = v.gender === 'female' ? '👩' : v.gender === 'male' ? '👨' : '🔊';
+        const badges = [];
+        if (v.enhanced) badges.push('<span class="vbadge good">Enhanced</span>');
+        if (v.localService) badges.push('<span class="vbadge">Local</span>');
+        if (v.lowQuality) badges.push('<span class="vbadge bad">Cũ</span>');
+        return `
+          <div class="voice-row ${isActive ? 'active' : ''}" data-name="${escapeHtml(v.name)}">
+            <span class="voice-left">${genderIcon} <strong>${escapeHtml(v.name)}</strong> <span class="voice-lang">${escapeHtml(v.lang)}</span></span>
+            <span class="voice-badges">${badges.join('')}</span>
+            <button class="speak-btn preview-btn" data-preview="${escapeHtml(v.name)}" title="${I18N.t('word.listen')}">▶</button>
+          </div>
+        `;
+      };
+      const voicesHtml = voices.length
+        ? voices.map(voiceRow).join('')
+        : `<div class="empty-state" style="padding:16px;">${I18N.t('voice.noVoices')}</div>`;
+
+      backdrop.innerHTML = `
+        <div class="modal voice-picker">
+          <div class="modal-head">
+            <h2>${I18N.t('voice.pickTitle')}</h2>
+            <button class="icon-btn" id="closePicker" title="Close">✕</button>
+          </div>
+          <p class="modal-sub">${I18N.t('voice.pickSub')}</p>
+          <div class="voice-pills">
+            ${genderRow('auto', I18N.t('voice.auto'), '🤖')}
+            ${genderRow('female', I18N.t('voice.female'), '👩')}
+            ${genderRow('male', I18N.t('voice.male'), '👨')}
+          </div>
+          <div class="voice-list">${voicesHtml}</div>
+          <p class="source-note" style="margin-top:14px;">💡 ${I18N.t('voice.downloadHint')}</p>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const close = () => {
+        Pronunciation.cancel();
+        backdrop.remove();
+      };
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+      backdrop.querySelector('#closePicker').addEventListener('click', close);
+
+      backdrop.querySelectorAll('.voice-pill').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const g = btn.getAttribute('data-gender');
+          Pronunciation.setVoiceName(null);
+          Pronunciation.setGender(g);
+          syncVoiceLabel();
+          Pronunciation.speak('hello', null, btn);
+          backdrop.querySelectorAll('.voice-pill').forEach((b) => b.classList.toggle('active', b === btn));
+          backdrop.querySelectorAll('.voice-row').forEach((r) => r.classList.remove('active'));
+        });
       });
+
+      backdrop.querySelectorAll('.preview-btn').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const name = btn.getAttribute('data-preview');
+          // Preview without committing selection
+          const prev = Pronunciation.getVoiceName();
+          Pronunciation.setVoiceName(name);
+          Pronunciation.speak('hello', null, btn);
+          Pronunciation.setVoiceName(prev);
+        });
+      });
+
+      backdrop.querySelectorAll('.voice-row').forEach((row) => {
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.preview-btn')) return;
+          const name = row.getAttribute('data-name');
+          Pronunciation.setVoiceName(name);
+          syncVoiceLabel();
+          Pronunciation.speak('hello', null, row);
+          backdrop.querySelectorAll('.voice-row').forEach((r) => r.classList.toggle('active', r === row));
+          backdrop.querySelectorAll('.voice-pill').forEach((b) => b.classList.remove('active'));
+          toast(I18N.t('voice.changedTo') + ' ' + name);
+        });
+      });
+    }
+
+    if (voiceBtn) {
+      voiceBtn.addEventListener('click', openVoicePicker);
     }
 
     switchBtn.addEventListener('click', () => {

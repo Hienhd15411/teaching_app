@@ -1019,7 +1019,75 @@ input[type="text"]:focus { border-color: var(--primary); }
   color: var(--text-muted);
 }
 
-/* ===== TOEIC ===== */
+/* ===== Modal (voice picker) ===== */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 20px;
+  animation: fade 0.15s ease-out;
+}
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 560px; width: 100%;
+  max-height: 85vh; overflow: auto;
+  padding: 22px; box-shadow: var(--shadow);
+}
+.modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.modal-head h2 { margin: 0; font-size: 18px; }
+.modal-sub {
+  color: var(--text-muted); font-size: 13px;
+  margin: 0 0 14px; line-height: 1.45;
+}
+.voice-pills {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.voice-pill {
+  background: var(--bg-soft); border: 1px solid var(--border);
+  color: var(--text); padding: 8px 14px; border-radius: 999px;
+  cursor: pointer; font-size: 13px; transition: all 0.15s;
+}
+.voice-pill:hover { border-color: var(--primary); }
+.voice-pill.active {
+  background: var(--primary); border-color: var(--primary); color: white;
+  font-weight: 600;
+}
+.voice-list {
+  display: flex; flex-direction: column; gap: 4px;
+  border-top: 1px solid var(--bg-soft); padding-top: 10px;
+}
+.voice-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px;
+  cursor: pointer; transition: background 0.12s;
+  font-size: 14px;
+}
+.voice-row:hover { background: var(--bg-soft); }
+.voice-row.active {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid var(--primary);
+}
+.voice-row .voice-left { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.voice-row .voice-lang {
+  color: var(--text-muted); font-size: 11px;
+  margin-left: 6px; font-variant-numeric: tabular-nums;
+}
+.voice-row .voice-badges {
+  display: flex; gap: 4px; flex-shrink: 0;
+}
+.vbadge {
+  background: var(--bg-soft); color: var(--text-muted);
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.vbadge.good { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.vbadge.bad { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+.preview-btn { margin-left: 4px; }
 .edition-section { margin-bottom: 28px; }
 .edition-header {
   display: flex; justify-content: space-between; align-items: baseline;
