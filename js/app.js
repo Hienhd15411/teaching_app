@@ -71,8 +71,26 @@
     if (p) {
       chipEl.hidden = false;
       navEl.hidden = false;
-      document.getElementById('profileAvatar').textContent = p.avatar || '🙂';
-      document.getElementById('profileName').textContent = p.name;
+      const avatarEl = document.getElementById('profileAvatar');
+      const nameEl = document.getElementById('profileName');
+      avatarEl.textContent = p.avatar || '🙂';
+      nameEl.textContent = p.name;
+      nameEl.title = p.name;
+
+      const cloudAuth = typeof FirebaseSync !== 'undefined'
+        && FirebaseSync.enabled()
+        && FirebaseSync.getCurrentUser();
+      if (switchBtn) {
+        if (cloudAuth) {
+          switchBtn.classList.add('signout-btn');
+          switchBtn.innerHTML = '⎋ ' + I18N.t('auth.signOut');
+          switchBtn.title = I18N.t('auth.signOut');
+        } else {
+          switchBtn.classList.remove('signout-btn');
+          switchBtn.innerHTML = '↺';
+          switchBtn.title = I18N.t('profile.switch') || 'Đổi profile';
+        }
+      }
     } else {
       chipEl.hidden = true;
       navEl.hidden = true;
