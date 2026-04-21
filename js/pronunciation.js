@@ -88,6 +88,17 @@
       if (pick) return pick;
     }
 
+    // 0b. Gender-default: user picked "male" or "female" → lock to a known
+    // voice by name (teacher preference), with scored fallback if missing.
+    if (preferredGender === 'male') {
+      const fred = voices.find((v) => (v.name || '').toLowerCase() === 'fred');
+      if (fred) return fred;
+    }
+    if (preferredGender === 'female') {
+      const samantha = voices.find((v) => (v.name || '').toLowerCase() === 'samantha');
+      if (samantha) return samantha;
+    }
+
     const enLocal = voices.filter((v) => v.localService && (v.lang || '').toLowerCase().startsWith('en'));
 
     // Score a voice: higher = better. We tilt toward natural-sounding
