@@ -42,9 +42,7 @@
   global.FIREBASE_CONFIG = {
     apiKey: 'AIzaSyBwPovKwvCD49C-49hAlp1_TBzRIWkLLk8',
     authDomain: 'teaching-app-3959a.firebaseapp.com',
-    // TODO: paste databaseURL after creating Realtime Database.
-    // It looks like: https://teaching-app-3959a-default-rtdb.<region>.firebasedatabase.app
-    databaseURL: 'https://teaching-app-3959a-default-rtdb.firebaseio.com',
+    databaseURL: 'https://teaching-app-3959a-default-rtdb.asia-southeast1.firebasedatabase.app',
     projectId: 'teaching-app-3959a',
     storageBucket: 'teaching-app-3959a.firebasestorage.app',
     messagingSenderId: '1055636163241',
