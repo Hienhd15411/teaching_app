@@ -787,6 +787,64 @@ input[type="text"]:focus { border-color: var(--primary); }
 }
 .game-result .big { font-size: 48px; margin-bottom: 8px; }
 .game-result .score { font-size: 28px; font-weight: 700; margin: 14px 0; }
+.grade-card {
+  max-width: 280px;
+  margin: 18px auto 12px;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  border: 2px solid var(--border);
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.grade-card .grade-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+.grade-card .grade-score {
+  font-size: 54px;
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 4px 0;
+}
+.grade-card .grade-score .grade-max {
+  font-size: 24px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.grade-card .grade-rank {
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.grade-card.grade-excellent {
+  border-color: var(--success);
+  background: rgba(34, 197, 94, 0.08);
+}
+.grade-card.grade-excellent .grade-score { color: var(--success); }
+.grade-card.grade-good {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+.grade-card.grade-good .grade-score { color: var(--primary-hover); }
+.grade-card.grade-fair {
+  border-color: var(--accent);
+  background: rgba(236, 72, 153, 0.08);
+}
+.grade-card.grade-fair .grade-score { color: var(--accent); }
+.grade-card.grade-pass {
+  border-color: var(--warning);
+  background: rgba(245, 158, 11, 0.08);
+}
+.grade-card.grade-pass .grade-score { color: var(--warning); }
+.grade-card.grade-fail {
+  border-color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+.grade-card.grade-fail .grade-score { color: var(--danger); }
 .game-result .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));

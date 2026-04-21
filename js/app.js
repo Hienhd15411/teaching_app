@@ -274,6 +274,26 @@
     const total = result.correct + result.wrong;
     const acc = total ? Math.round((result.correct / total) * 100) : 0;
     const dur = Math.round(result.durationSec || 0);
+    // Vietnamese 10-point grading scale
+    const score10 = total ? Math.round((result.correct / total) * 100) / 10 : 0;
+    const gradeLabel =
+      acc >= 90 ? t('result.gradeExcellent') :
+      acc >= 80 ? t('result.gradeGood') :
+      acc >= 70 ? t('result.gradeFair') :
+      acc >= 50 ? t('result.gradePass') :
+      t('result.gradeFail');
+    const gradeClass =
+      acc >= 90 ? 'grade-excellent' :
+      acc >= 80 ? 'grade-good' :
+      acc >= 70 ? 'grade-fair' :
+      acc >= 50 ? 'grade-pass' :
+      'grade-fail';
+    const gradeEmoji =
+      acc >= 90 ? '🏆' :
+      acc >= 80 ? '🎉' :
+      acc >= 70 ? '👏' :
+      acc >= 50 ? '👍' :
+      '💪';
     const badgeHtml = (newBadges || []).map((id) => {
       const b = Progress.getBadgeDef(id);
       return `<span class="badge-earned">${b.emoji} ${t(b.nameKey)}</span>`;
@@ -282,8 +302,13 @@
     appEl.innerHTML = `
       <section class="view game-view">
         <div class="game-result">
-          <div class="big">${acc >= 80 ? '🎉' : acc >= 50 ? '👍' : '💪'}</div>
+          <div class="big">${gradeEmoji}</div>
           <h2>${t('result.title')}</h2>
+          <div class="grade-card ${gradeClass}">
+            <div class="grade-label">${t('result.grade')}</div>
+            <div class="grade-score">${score10.toFixed(1)}<span class="grade-max">/10</span></div>
+            <div class="grade-rank">${gradeLabel}</div>
+          </div>
           <div class="stats">
             <div class="stat"><div class="v">${result.correct}/${total}</div><div class="l">${t('game.correct')}</div></div>
             <div class="stat"><div class="v">${acc}%</div><div class="l">${t('result.accuracy')}</div></div>
@@ -741,7 +766,11 @@
         Pronunciation.setGender(next);
         syncVoiceLabel();
         const labels = { auto: I18N.t('voice.auto'), female: I18N.t('voice.female'), male: I18N.t('voice.male') };
-        toast(I18N.t('voice.changedTo') + ' ' + labels[next]);
+        const info = Pronunciation.getCurrentVoiceInfo();
+        let msg = I18N.t('voice.changedTo') + ' ' + labels[next];
+        if (info && info.name) msg += ' — ' + info.name;
+        if (info && info.lowQuality) msg += ' ' + I18N.t('voice.oldHint');
+        toast(msg);
         // Sample the new voice immediately so the user hears the change.
         Pronunciation.speak('hello', null, voiceBtn);
       });

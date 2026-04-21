@@ -189,10 +189,29 @@
     });
   }
 
+  // Info about what voice will be used next. Useful for UI tooltips.
+  function getCurrentVoiceInfo() {
+    if (!SUPPORTED) return null;
+    const v = pickEnglishVoice();
+    if (!v) return null;
+    const name = v.name || '';
+    const lowQuality = /\b(alex|fred|bruce|junior|ralph|whisper|bahh|trinoids|zarvox|cellos|hysterical|bells|organ|boing|bubbles|deranged|pipe organ)\b/i.test(name);
+    const enhanced = /enhanced|premium|natural|neural/i.test(name);
+    return {
+      name: v.name,
+      lang: v.lang,
+      gender: detectGender(v),
+      localService: v.localService,
+      lowQuality,
+      enhanced,
+    };
+  }
+
   global.Pronunciation = {
     speak, cancel, bindSpeakers,
     supported: SUPPORTED,
     getGender, setGender,
     listEnglishVoicesByGender,
+    getCurrentVoiceInfo,
   };
 })(window);
