@@ -1012,17 +1012,88 @@
       voiceBtn.addEventListener('click', openVoicePicker);
     }
 
-    switchBtn.addEventListener('click', () => {
-      Storage.setActiveProfile(null);
-      navigate('profile');
+    switchBtn.addEventListener('click', async () => {
+      if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()
+          && FirebaseSync.getCurrentUser()) {
+        await FirebaseSync.signOut();
+        // onAuthChange will navigate to profile.
+      } else {
+        Storage.setActiveProfile(null);
+        navigate('profile');
+      }
     });
 
+    // Hook Firebase auth state if enabled.
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
+      FirebaseSync.onAuthChange(async (user) => {
+        if (user) {
+          await hydrateLocalFromCloud(user);
+          syncClassNav();
+          if (currentView === 'profile' || !currentView) navigate('topics');
+        } else {
+          Storage.setActiveProfile(null);
+          syncClassNav();
+          navigate('profile');
+        }
+      });
+    }
+    syncClassNav();
+
     // Initial route
-    if (!Storage.getActiveProfileId() || !Storage.getActiveProfile()) {
+    const hasActive = Storage.getActiveProfileId() && Storage.getActiveProfile();
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
+      // Wait for onAuthChange; default to auth screen meanwhile.
+      navigate('profile');
+    } else if (!hasActive) {
       navigate('profile');
     } else {
       navigate('topics');
     }
+  }
+
+  async function hydrateLocalFromCloud(user) {
+    // Pull user's cloud state; create a local profile mirror using the
+    // Firebase uid as the profile id so progress saves line up.
+    const data = await FirebaseSync.pullCurrentUser();
+    const cloudProfile = (data && data.profile) || {};
+    const cloudProgress = (data && data.progress) || Storage.emptyProgress();
+
+    const profiles = Storage.getProfiles();
+    let localProfile = profiles.find((p) => p.id === user.uid);
+    if (!localProfile) {
+      localProfile = {
+        id: user.uid,
+        name: cloudProfile.name || user.displayName || (user.email || '').split('@')[0],
+        avatar: cloudProfile.avatar || '🙂',
+        createdAt: cloudProfile.createdAt || Date.now(),
+      };
+      profiles.push(localProfile);
+    } else {
+      // Refresh from cloud values (in case they changed on another device)
+      if (cloudProfile.name) localProfile.name = cloudProfile.name;
+      if (cloudProfile.avatar) localProfile.avatar = cloudProfile.avatar;
+    }
+    localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
+
+    // Save progress locally so the rest of the app reads from the
+    // familiar storage path.
+    localStorage.setItem('vlt_progress_' + user.uid, JSON.stringify(cloudProgress));
+    Storage.setActiveProfile(user.uid);
+    renderHeader();
+  }
+
+  function syncClassNav() {
+    const classBtn = document.querySelector('[data-view-link="class"]');
+    if (!classBtn) return;
+    let showClass = false;
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
+      const u = FirebaseSync.getCurrentUser();
+      if (u && FirebaseSync.isTeacher(u)) showClass = true;
+    } else {
+      // No cloud — hide class tab entirely.
+      showClass = false;
+    }
+    classBtn.hidden = !showClass;
   }
 
   global.App = { navigate, toast, renderHeader };

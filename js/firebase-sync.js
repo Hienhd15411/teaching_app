@@ -1,18 +1,19 @@
 (function (global) {
   'use strict';
 
-  // Thin wrapper around Firebase Realtime Database for class-wide sync.
+  // Firebase Realtime Database + Email/Password Auth.
   //
-  // Design:
-  //   - localStorage remains the source of truth (offline-first).
-  //   - Every saveProgress debounces a push to /users/{profileId}.
-  //   - Each entry: { profile: {name, avatar, createdAt}, progress, updatedAt }.
-  //   - Teacher dashboard reads /users once per open.
+  //   /users/{uid} = { profile, progress, updatedAt }
   //
-  // The module no-ops if FIREBASE_CONFIG still has placeholder values or
-  // the Firebase SDK didn't load. Callers can check `FirebaseSync.enabled`.
+  // Each student signs up with email/password → Firebase assigns a
+  // stable uid. We use that uid as the profile id locally so the
+  // local cache and cloud row match up exactly.
+  //
+  // Teachers (email in TEACHER_EMAILS) see the Class dashboard,
+  // which lists all students from /users.
 
   const cfg = global.FIREBASE_CONFIG || {};
+  const teacherEmails = (global.TEACHER_EMAILS || []).map((e) => String(e).toLowerCase().trim());
   const hasRealConfig = cfg.apiKey
     && cfg.apiKey !== 'YOUR_API_KEY'
     && cfg.databaseURL
@@ -23,39 +24,96 @@
   let app = null;
   let db = null;
   let auth = null;
-  let ready = false;
-  let readyListeners = [];
+  let currentUser = null;
+  let authListeners = [];
 
   function enabled() { return hasRealConfig && sdkLoaded; }
 
-  async function init() {
-    if (!enabled()) return false;
-    if (app) return ready;
+  function init() {
+    if (!enabled() || app) return;
     try {
       app = firebase.initializeApp(cfg);
       auth = firebase.auth();
       db = firebase.database();
-      await auth.signInAnonymously();
-      ready = true;
-      readyListeners.forEach((fn) => { try { fn(); } catch (e) {} });
-      readyListeners = [];
-      return true;
+      auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
+      auth.onAuthStateChanged((user) => {
+        currentUser = user || null;
+        authListeners.forEach((fn) => { try { fn(currentUser); } catch (e) {} });
+      });
     } catch (e) {
       console.warn('[FirebaseSync] init failed', e);
-      return false;
     }
   }
 
-  function whenReady(fn) {
-    if (ready) { fn(); return; }
-    readyListeners.push(fn);
+  function onAuthChange(fn) { authListeners.push(fn); return () => {
+    const i = authListeners.indexOf(fn);
+    if (i >= 0) authListeners.splice(i, 1);
+  }; }
+
+  function getCurrentUser() { return currentUser; }
+
+  function isTeacher(emailOrUser) {
+    const email = (emailOrUser && emailOrUser.email) || emailOrUser;
+    if (!email) return false;
+    return teacherEmails.indexOf(String(email).toLowerCase().trim()) >= 0;
   }
 
-  // --- Push helpers (fire-and-forget) ---
+  // --- Auth ---
+  async function signUp(email, password, displayName, avatar) {
+    if (!enabled()) throw new Error('Firebase not configured');
+    init();
+    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    const user = cred.user;
+    // Seed an empty profile in /users/{uid} so the student shows up in the
+    // class dashboard even before doing any activity.
+    const profile = {
+      id: user.uid,
+      name: displayName || (email.split('@')[0]),
+      email: user.email,
+      avatar: avatar || '🙂',
+      createdAt: Date.now(),
+    };
+    await db.ref('users/' + user.uid).set({
+      profile,
+      progress: Storage.emptyProgress(),
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    });
+    return user;
+  }
+
+  async function signIn(email, password) {
+    if (!enabled()) throw new Error('Firebase not configured');
+    init();
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    return cred.user;
+  }
+
+  async function signOut() {
+    if (!enabled() || !auth) return;
+    await auth.signOut();
+  }
+
+  async function sendPasswordReset(email) {
+    if (!enabled()) throw new Error('Firebase not configured');
+    init();
+    await auth.sendPasswordResetEmail(email);
+  }
+
+  // --- Sync ---
+  async function pullCurrentUser() {
+    if (!enabled() || !currentUser) return null;
+    try {
+      const snap = await db.ref('users/' + currentUser.uid).once('value');
+      return snap.val();
+    } catch (e) {
+      console.warn('[FirebaseSync] pull failed', e);
+      return null;
+    }
+  }
 
   let pendingPush = null;
   function scheduleProgressPush() {
-    if (!enabled()) return;
+    if (!enabled() || !currentUser) return;
     if (pendingPush) clearTimeout(pendingPush);
     pendingPush = setTimeout(() => {
       pendingPush = null;
@@ -64,43 +122,31 @@
   }
 
   async function pushActiveProfile() {
-    if (!enabled()) return;
-    await init();
-    if (!ready) return;
+    if (!enabled() || !currentUser) return;
     const profile = Storage.getActiveProfile();
-    if (!profile) return;
+    if (!profile || profile.id !== currentUser.uid) return;
     const progress = Storage.getProgress(profile.id);
-    const payload = {
-      profile: {
-        id: profile.id,
-        name: profile.name,
-        avatar: profile.avatar || '🙂',
-        createdAt: profile.createdAt || Date.now(),
-      },
-      progress: progress,
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-    };
     try {
-      await db.ref('users/' + profile.id).set(payload);
+      await db.ref('users/' + currentUser.uid).update({
+        profile: {
+          id: profile.id,
+          name: profile.name,
+          email: currentUser.email || '',
+          avatar: profile.avatar || '🙂',
+          createdAt: profile.createdAt || Date.now(),
+        },
+        progress: progress,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      });
     } catch (e) {
       console.warn('[FirebaseSync] push failed', e);
     }
   }
 
-  async function deleteProfile(profileId) {
-    if (!enabled()) return;
-    await init();
-    if (!ready) return;
-    try { await db.ref('users/' + profileId).remove(); }
-    catch (e) { console.warn('[FirebaseSync] delete failed', e); }
-  }
-
-  // --- Read helpers (for teacher dashboard) ---
-
+  // --- Teacher read ---
   async function listAllStudents() {
-    if (!enabled()) return [];
-    await init();
-    if (!ready) return [];
+    if (!enabled() || !currentUser) return [];
+    if (!isTeacher(currentUser)) return [];
     try {
       const snap = await db.ref('users').once('value');
       const val = snap.val() || {};
@@ -117,19 +163,22 @@
   }
 
   global.FirebaseSync = {
-    init,
-    whenReady,
     enabled,
+    init,
+    onAuthChange,
+    getCurrentUser,
+    isTeacher,
+    signUp,
+    signIn,
+    signOut,
+    sendPasswordReset,
+    pullCurrentUser,
     scheduleProgressPush,
     pushActiveProfile,
-    deleteProfile,
     listAllStudents,
-    hasRealConfig: hasRealConfig,
-    sdkLoaded: sdkLoaded,
+    hasRealConfig,
+    sdkLoaded,
   };
 
-  // Auto-init on load if config is real.
-  if (enabled()) {
-    init();
-  }
+  if (enabled()) init();
 })(window);
