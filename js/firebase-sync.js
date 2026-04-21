@@ -73,7 +73,11 @@
     if (!enabled()) throw new Error('Firebase not configured');
     init();
     console.log('[FirebaseSync] signUp:', email);
-    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    const cred = await withTimeout(
+      auth.createUserWithEmailAndPassword(email, password),
+      8000,
+      'Sign up'
+    );
     const user = cred.user;
     console.log('[FirebaseSync] auth created, uid:', user.uid, '— seeding DB row...');
     const profile = {
@@ -107,7 +111,12 @@
     if (!enabled()) throw new Error('Firebase not configured');
     init();
     console.log('[FirebaseSync] signIn:', email);
-    const cred = await auth.signInWithEmailAndPassword(email, password);
+    const cred = await withTimeout(
+      auth.signInWithEmailAndPassword(email, password),
+      8000,
+      'Sign in'
+    );
+    console.log('[FirebaseSync] signIn ok, uid:', cred.user.uid);
     return cred.user;
   }
 

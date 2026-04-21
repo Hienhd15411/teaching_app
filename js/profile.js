@@ -94,26 +94,39 @@
 
       submitBtn.disabled = true;
       submitBtn.textContent = t('auth.working');
+
+      // Independent watchdog: even if the auth await hangs forever, this
+      // fires after 10s and either navigates (if auth already succeeded
+      // under the hood) or re-enables the button so the user can retry.
+      const watchdog = setTimeout(() => {
+        if (!document.querySelector('#authForm')) return;
+        const u = FirebaseSync.getCurrentUser();
+        if (u && typeof App !== 'undefined') {
+          App.navigate('topics');
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.textContent = isSignUp ? t('auth.createAccount') : t('auth.signIn');
+          showErr(t('auth.errGeneric') + ' (timeout)');
+        }
+      }, 10000);
+
       try {
         if (isSignUp) {
           await FirebaseSync.signUp(email, password, name, selectedAvatar);
         } else {
           await FirebaseSync.signIn(email, password);
         }
-        // onAuthChange in app.js hydrates local profile + navigates.
-        // Fallback: if for any reason we're still on the auth screen
-        // 3 seconds after auth succeeded, force-navigate.
+        // Success — onAuthChange in app.js will navigate. If it doesn't
+        // fire within ~2s, do it ourselves so the user isn't stuck.
         setTimeout(() => {
           if (!document.querySelector('#authForm')) return;
-          const u = FirebaseSync.getCurrentUser();
-          if (u && typeof App !== 'undefined') {
+          if (FirebaseSync.getCurrentUser() && typeof App !== 'undefined') {
+            clearTimeout(watchdog);
             App.navigate('topics');
-          } else {
-            submitBtn.disabled = false;
-            submitBtn.textContent = isSignUp ? t('auth.createAccount') : t('auth.signIn');
           }
-        }, 3000);
+        }, 2000);
       } catch (e) {
+        clearTimeout(watchdog);
         showErr(mapAuthError(e));
         submitBtn.disabled = false;
         submitBtn.textContent = isSignUp ? t('auth.createAccount') : t('auth.signIn');
