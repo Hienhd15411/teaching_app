@@ -73,6 +73,9 @@ button {
 
 .header-right { display: flex; align-items: center; gap: 10px; }
 
+/* Force-hide anything with [hidden] even when other rules set display. */
+[hidden] { display: none !important; }
+
 .profile-chip {
   display: flex;
   align-items: center;

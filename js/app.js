@@ -94,6 +94,11 @@
     } else {
       chipEl.hidden = true;
       navEl.hidden = true;
+      // Clear residual text so nothing leaks into the next login.
+      const nameEl = document.getElementById('profileName');
+      const avatarEl = document.getElementById('profileAvatar');
+      if (nameEl) { nameEl.textContent = ''; nameEl.title = ''; }
+      if (avatarEl) avatarEl.textContent = '🙂';
     }
   }
 
