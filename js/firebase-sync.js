@@ -58,14 +58,24 @@
     return teacherEmails.indexOf(String(email).toLowerCase().trim()) >= 0;
   }
 
+  function withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error(label + ' timed out after ' + ms + 'ms')),
+        ms
+      )),
+    ]);
+  }
+
   // --- Auth ---
   async function signUp(email, password, displayName, avatar) {
     if (!enabled()) throw new Error('Firebase not configured');
     init();
+    console.log('[FirebaseSync] signUp:', email);
     const cred = await auth.createUserWithEmailAndPassword(email, password);
     const user = cred.user;
-    // Seed an empty profile in /users/{uid} so the student shows up in the
-    // class dashboard even before doing any activity.
+    console.log('[FirebaseSync] auth created, uid:', user.uid, '— seeding DB row...');
     const profile = {
       id: user.uid,
       name: displayName || (email.split('@')[0]),
@@ -73,17 +83,30 @@
       avatar: avatar || '🙂',
       createdAt: Date.now(),
     };
-    await db.ref('users/' + user.uid).set({
-      profile,
-      progress: Storage.emptyProgress(),
-      updatedAt: firebase.database.ServerValue.TIMESTAMP,
-    });
+    try {
+      await withTimeout(
+        db.ref('users/' + user.uid).set({
+          profile,
+          progress: Storage.emptyProgress(),
+          updatedAt: firebase.database.ServerValue.TIMESTAMP,
+        }),
+        8000,
+        'Database write'
+      );
+      console.log('[FirebaseSync] DB seed OK');
+    } catch (dbErr) {
+      // Auth already succeeded — don't block sign-in. The onAuthChange
+      // handler will try pullCurrentUser (also likely to fail), and
+      // hydrateLocalFromCloud will fall back to creating a local profile.
+      console.warn('[FirebaseSync] DB seed failed, continuing:', dbErr);
+    }
     return user;
   }
 
   async function signIn(email, password) {
     if (!enabled()) throw new Error('Firebase not configured');
     init();
+    console.log('[FirebaseSync] signIn:', email);
     const cred = await auth.signInWithEmailAndPassword(email, password);
     return cred.user;
   }
@@ -103,7 +126,11 @@
   async function pullCurrentUser() {
     if (!enabled() || !currentUser) return null;
     try {
-      const snap = await db.ref('users/' + currentUser.uid).once('value');
+      const snap = await withTimeout(
+        db.ref('users/' + currentUser.uid).once('value'),
+        8000,
+        'Database read'
+      );
       return snap.val();
     } catch (e) {
       console.warn('[FirebaseSync] pull failed', e);

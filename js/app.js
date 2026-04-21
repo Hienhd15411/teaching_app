@@ -1053,8 +1053,16 @@
 
   async function hydrateLocalFromCloud(user) {
     // Pull user's cloud state; create a local profile mirror using the
-    // Firebase uid as the profile id so progress saves line up.
-    const data = await FirebaseSync.pullCurrentUser();
+    // Firebase uid as the profile id so progress saves line up. If the
+    // pull times out (e.g. wrong databaseURL or unpublished rules),
+    // fall back to creating a bare profile from the auth user info so
+    // the sign-up flow never gets stuck.
+    let data = null;
+    try {
+      data = await FirebaseSync.pullCurrentUser();
+    } catch (e) {
+      console.warn('[app] pullCurrentUser failed, continuing with empty state', e);
+    }
     const cloudProfile = (data && data.profile) || {};
     const cloudProgress = (data && data.progress) || Storage.emptyProgress();
 
