@@ -51,7 +51,10 @@
   };
 
   // Emails that get access to the Class dashboard. Usually just you.
+  // IMPORTANT: the email here must exactly match the one the teacher
+  // signed up with in-app. @example.com is a placeholder — replace with
+  // your real email (@gmail.com, your school domain, etc.).
   global.TEACHER_EMAILS = [
-    // 'lemytrinh1801@example.com',
+    'lemytrinh1801@example.com',
   ];
 })(window);
