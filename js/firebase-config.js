@@ -1,36 +1,21 @@
-// ============================================================
-// FIREBASE CONFIG
-// ============================================================
-// 1. Go to https://console.firebase.google.com → Add project (free).
-// 2. Project Settings → General → Your apps → Web app (</>) → Register.
-//    Copy the `firebaseConfig` values shown.
-// 3. In the left menu: Authentication → Sign-in method → enable
-//    "Anonymous".
-// 4. In the left menu: Build → Realtime Database → Create database →
-//    pick region → Start in "locked mode" → then Rules tab, paste:
-//
-//      {
-//        "rules": {
-//          ".read": "auth != null",
-//          ".write": "auth != null"
-//        }
-//      }
-//
-//    Publish. (For a tighter setup, restrict per-user writes later.)
-// 5. Paste the config below. The `databaseURL` is the critical one for
-//    Realtime Database — if it's missing from the snippet shown on
-//    Firebase console, grab it from: Build → Realtime Database → your
-//    DB → top of page (e.g. https://xxxxx-default-rtdb.firebaseio.com).
-//
-// While the values are the defaults ("YOUR_...") the app runs in
-// local-only mode — nothing is sent to any server.
-(function (global) {
-  'use strict';
-  global.FIREBASE_CONFIG = {
-    apiKey: 'YOUR_API_KEY',
-    authDomain: 'YOUR_PROJECT.firebaseapp.com',
-    databaseURL: 'https://YOUR_PROJECT-default-rtdb.firebaseio.com',
-    projectId: 'YOUR_PROJECT',
-    appId: 'YOUR_APP_ID',
-  };
-})(window);
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBwPovKwvCD49C-49hAlp1_TBzRIWkLLk8",
+  authDomain: "teaching-app-3959a.firebaseapp.com",
+  projectId: "teaching-app-3959a",
+  storageBucket: "teaching-app-3959a.firebasestorage.app",
+  messagingSenderId: "1055636163241",
+  appId: "1:1055636163241:web:d5454d87d7e57dc06d37b8",
+  measurementId: "G-0Q61EHF9HE"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
