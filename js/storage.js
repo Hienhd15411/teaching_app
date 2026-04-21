@@ -51,6 +51,9 @@
     if (getActiveProfileId() === id) {
       localStorage.removeItem(ACTIVE_KEY);
     }
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
+      FirebaseSync.deleteProfile(id);
+    }
   }
 
   function getActiveProfileId() {
@@ -91,6 +94,10 @@
     const id = profileId || getActiveProfileId();
     if (!id) return;
     writeJSON(PROGRESS_PREFIX + id, progress);
+    // Fire-and-forget cloud sync; no-op if Firebase disabled.
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
+      FirebaseSync.scheduleProgressPush();
+    }
   }
 
   function exportProfile(profileId) {

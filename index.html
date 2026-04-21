@@ -16,6 +16,7 @@
       <button class="nav-btn" data-view-link="topics" data-i18n="nav.topics">Chủ đề</button>
       <button class="nav-btn" data-view-link="progress" data-i18n="nav.progress">Tiến độ</button>
       <button class="nav-btn" data-view-link="toeic" data-i18n="nav.toeic">TOEIC</button>
+      <button class="nav-btn" data-view-link="class" data-i18n="nav.class">Lớp học</button>
     </nav>
     <div class="header-right">
       <div class="profile-chip" id="profileChip" hidden>
@@ -46,9 +47,16 @@
   <script src="js/data/toeic-part6.js"></script>
   <script src="js/data/toeic-part7.js"></script>
 
+  <!-- Firebase (loaded from CDN; no-ops if config is placeholder) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-database-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
+
   <!-- Core -->
   <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/firebase-sync.js"></script>
   <script src="js/srs.js"></script>
   <script src="js/progress.js"></script>
   <script src="js/pronunciation.js"></script>

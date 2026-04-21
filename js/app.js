@@ -36,6 +36,9 @@
       case 'toeic':
         renderToeic();
         break;
+      case 'class':
+        renderClass();
+        break;
       case 'toeic-part':
         renderToeicPart(params.editionId, params.partId);
         break;
@@ -54,7 +57,8 @@
         || (view === 'topic' && v === 'topics')
         || (view === 'game' && v === 'topics' && !currentToeicContext)
         || (view === 'game' && v === 'toeic' && currentToeicContext)
-        || (view === 'toeic-part' && v === 'toeic');
+        || (view === 'toeic-part' && v === 'toeic')
+        || (view === 'class' && v === 'class');
       b.classList.toggle('active', matches);
     });
   }
@@ -722,6 +726,158 @@
     `;
   }
 
+  // ========== Class (teacher) dashboard ==========
+  function renderClass() {
+    const t = I18N.t;
+
+    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.enabled()) {
+      appEl.innerHTML = `
+        <section class="view">
+          <h1>${t('class.title')}</h1>
+          <div class="empty-state" style="padding:30px 20px;">
+            <div style="font-size:42px;margin-bottom:10px;">☁️</div>
+            <h2 style="margin:0 0 8px;">${t('class.disabled')}</h2>
+            <p style="color:var(--text-muted);max-width:520px;margin:0 auto;line-height:1.5;">${t('class.disabledHint')}</p>
+          </div>
+        </section>
+      `;
+      return;
+    }
+
+    appEl.innerHTML = `
+      <section class="view">
+        <div class="topics-header">
+          <div>
+            <h1>${t('class.title')}</h1>
+            <p>${t('class.subtitle')} <span style="color:var(--success);font-size:12px;">${t('class.synced')}</span></p>
+          </div>
+          <div class="btn-row">
+            <button class="btn secondary" id="refreshClassBtn">↻ ${t('class.refresh')}</button>
+            <button class="btn secondary" id="exportClassBtn">⬇️ ${t('class.exportCsv')}</button>
+          </div>
+        </div>
+        <div id="classContent" class="empty-state" style="padding:30px 20px;">${t('class.loading')}</div>
+      </section>
+    `;
+
+    const loadList = async () => {
+      const content = appEl.querySelector('#classContent');
+      content.innerHTML = `<div class="empty-state" style="padding:30px 20px;">${t('class.loading')}</div>`;
+      const students = await FirebaseSync.listAllStudents();
+      lastStudents = students;
+      paintList(students);
+    };
+
+    let lastStudents = [];
+
+    const paintList = (students) => {
+      const content = appEl.querySelector('#classContent');
+      if (!students.length) {
+        content.className = 'empty-state';
+        content.style.padding = '30px 20px';
+        content.innerHTML = t('class.empty');
+        return;
+      }
+      content.className = '';
+      content.style.padding = '0';
+
+      // Enrich each student with computed stats
+      const rows = students.map((s) => {
+        const p = s.progress || {};
+        const wordsSeen = Object.keys(p.perWord || {}).length;
+        let mastered = 0;
+        Object.values(p.perWord || {}).forEach((w) => { if (w.box >= 4) mastered += 1; });
+        const streak = p.streak || 0;
+        const xp = p.xp || 0;
+        const level = p.level || 1;
+        const lastMs = s.updatedAt || 0;
+        return { s, p, wordsSeen, mastered, streak, xp, level, lastMs };
+      });
+
+      // Default sort: XP descending
+      rows.sort((a, b) => b.xp - a.xp);
+
+      const lastActiveLabel = (ms) => {
+        if (!ms) return t('class.neverActive');
+        const days = Math.floor((Date.now() - ms) / 86400000);
+        if (days <= 0) return t('class.today');
+        return days + ' ' + t('class.daysAgo');
+      };
+
+      const body = rows.map((r, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>${escapeHtml(r.s.profile.avatar || '🙂')} <strong>${escapeHtml(r.s.profile.name || r.s.id)}</strong></td>
+          <td class="num">${r.level}</td>
+          <td class="num">${r.xp}</td>
+          <td class="num">🔥 ${r.streak}</td>
+          <td class="num">${r.wordsSeen}</td>
+          <td class="num">${r.mastered}</td>
+          <td class="num muted">${lastActiveLabel(r.lastMs)}</td>
+        </tr>
+      `).join('');
+
+      content.innerHTML = `
+        <div style="color:var(--text-muted);font-size:13px;margin-bottom:10px;">${students.length} ${t('class.totalStudents')}</div>
+        <table class="progress-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>${t('class.student')}</th>
+              <th class="num">${t('class.level')}</th>
+              <th class="num">${t('class.xp')}</th>
+              <th class="num">${t('class.streak')}</th>
+              <th class="num">${t('class.wordsSeen')}</th>
+              <th class="num">${t('class.mastered')}</th>
+              <th class="num">${t('class.lastActive')}</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+    };
+
+    appEl.querySelector('#refreshClassBtn').addEventListener('click', loadList);
+    appEl.querySelector('#exportClassBtn').addEventListener('click', () => exportClassCsv(lastStudents));
+    loadList();
+  }
+
+  function exportClassCsv(students) {
+    if (!students || !students.length) return;
+    const header = ['id', 'name', 'level', 'xp', 'streak', 'wordsSeen', 'mastered', 'updatedAt'];
+    const rows = [header.join(',')];
+    students.forEach((s) => {
+      const p = s.progress || {};
+      const wordsSeen = Object.keys(p.perWord || {}).length;
+      let mastered = 0;
+      Object.values(p.perWord || {}).forEach((w) => { if (w.box >= 4) mastered += 1; });
+      rows.push([
+        csvCell(s.id),
+        csvCell(s.profile && s.profile.name || ''),
+        p.level || 1,
+        p.xp || 0,
+        p.streak || 0,
+        wordsSeen,
+        mastered,
+        s.updatedAt ? new Date(s.updatedAt).toISOString() : '',
+      ].join(','));
+    });
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'class-progress-' + Progress.todayStr() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function csvCell(v) {
+    const s = String(v == null ? '' : v).replace(/"/g, '""');
+    return /[,"\n]/.test(s) ? '"' + s + '"' : s;
+  }
+
   // ========== Boot ==========
   function boot() {
     I18N.applyStaticTranslations();
@@ -730,7 +886,7 @@
     document.querySelectorAll('[data-view-link]').forEach((el) => {
       el.addEventListener('click', () => {
         const v = el.getAttribute('data-view-link');
-        if (v === 'topics' || v === 'progress' || v === 'toeic') {
+        if (v === 'topics' || v === 'progress' || v === 'toeic' || v === 'class') {
           if (!Storage.getActiveProfileId()) {
             navigate('profile');
           } else {
