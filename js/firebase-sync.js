@@ -90,7 +90,7 @@
           progress: Storage.emptyProgress(),
           updatedAt: firebase.database.ServerValue.TIMESTAMP,
         }),
-        8000,
+        4000,
         'Database write'
       );
       console.log('[FirebaseSync] DB seed OK');
@@ -128,7 +128,7 @@
     try {
       const snap = await withTimeout(
         db.ref('users/' + currentUser.uid).once('value'),
-        8000,
+        4000,
         'Database read'
       );
       return snap.val();

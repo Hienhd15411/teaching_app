@@ -1043,11 +1043,17 @@
 
     // Hook Firebase auth state if enabled.
     if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
-      FirebaseSync.onAuthChange(async (user) => {
+      FirebaseSync.onAuthChange((user) => {
         if (user) {
-          await hydrateLocalFromCloud(user);
+          // Navigate right away using whatever local info we have so the
+          // user never stares at 'Đang xử lý'. Cloud hydration runs in
+          // the background and updates the UI when it finishes.
+          ensureLocalProfileForUser(user);
+          Storage.setActiveProfile(user.uid);
+          renderHeader();
           syncClassNav();
           if (currentView === 'profile' || !currentView) navigate('topics');
+          hydrateLocalFromCloud(user).catch((e) => console.warn('[app] hydrate error', e));
         } else {
           Storage.setActiveProfile(null);
           syncClassNav();
@@ -1069,42 +1075,62 @@
     }
   }
 
-  async function hydrateLocalFromCloud(user) {
-    // Pull user's cloud state; create a local profile mirror using the
-    // Firebase uid as the profile id so progress saves line up. If the
-    // pull times out (e.g. wrong databaseURL or unpublished rules),
-    // fall back to creating a bare profile from the auth user info so
-    // the sign-up flow never gets stuck.
-    let data = null;
-    try {
-      data = await FirebaseSync.pullCurrentUser();
-    } catch (e) {
-      console.warn('[app] pullCurrentUser failed, continuing with empty state', e);
-    }
-    const cloudProfile = (data && data.profile) || {};
-    const cloudProgress = (data && data.progress) || Storage.emptyProgress();
-
+  function ensureLocalProfileForUser(user) {
     const profiles = Storage.getProfiles();
     let localProfile = profiles.find((p) => p.id === user.uid);
     if (!localProfile) {
       localProfile = {
         id: user.uid,
-        name: cloudProfile.name || user.displayName || (user.email || '').split('@')[0],
-        avatar: cloudProfile.avatar || '🙂',
-        createdAt: cloudProfile.createdAt || Date.now(),
+        name: user.displayName || (user.email || '').split('@')[0] || 'Me',
+        avatar: '🙂',
+        createdAt: Date.now(),
       };
       profiles.push(localProfile);
-    } else {
-      // Refresh from cloud values (in case they changed on another device)
+      localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
+    }
+    return localProfile;
+  }
+
+  async function hydrateLocalFromCloud(user) {
+    // Pulls cloud state and merges onto the local profile. Runs in the
+    // background after the view has already swapped to 'topics', so a
+    // slow/failing DB read never blocks the UI.
+    let data = null;
+    try {
+      data = await FirebaseSync.pullCurrentUser();
+    } catch (e) {
+      console.warn('[app] pullCurrentUser failed — keeping local state', e);
+      return;
+    }
+    if (!data) return; // First signin or DB empty — keep local state.
+
+    const cloudProfile = data.profile || {};
+    const cloudProgress = data.progress || null;
+
+    // Update profile metadata from cloud (name/avatar may have changed
+    // on another device).
+    const profiles = Storage.getProfiles();
+    const localProfile = profiles.find((p) => p.id === user.uid);
+    if (localProfile) {
       if (cloudProfile.name) localProfile.name = cloudProfile.name;
       if (cloudProfile.avatar) localProfile.avatar = cloudProfile.avatar;
+      localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
     }
-    localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
 
-    // Save progress locally so the rest of the app reads from the
-    // familiar storage path.
-    localStorage.setItem('vlt_progress_' + user.uid, JSON.stringify(cloudProgress));
-    Storage.setActiveProfile(user.uid);
+    // Merge progress: never downgrade local. If cloud has more XP than
+    // local, trust cloud; otherwise keep local and push back up.
+    if (cloudProgress) {
+      const localProgress = Storage.getProgress(user.uid);
+      const localXp = localProgress.xp || 0;
+      const cloudXp = cloudProgress.xp || 0;
+      if (cloudXp > localXp) {
+        localStorage.setItem('vlt_progress_' + user.uid, JSON.stringify(cloudProgress));
+      } else if (localXp > cloudXp) {
+        // Local is ahead — schedule a push so cloud catches up.
+        FirebaseSync.scheduleProgressPush();
+      }
+      // Equal XP: assume they match, leave local alone.
+    }
     renderHeader();
   }
 

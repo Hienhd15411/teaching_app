@@ -101,6 +101,18 @@
           await FirebaseSync.signIn(email, password);
         }
         // onAuthChange in app.js hydrates local profile + navigates.
+        // Fallback: if for any reason we're still on the auth screen
+        // 3 seconds after auth succeeded, force-navigate.
+        setTimeout(() => {
+          if (!document.querySelector('#authForm')) return;
+          const u = FirebaseSync.getCurrentUser();
+          if (u && typeof App !== 'undefined') {
+            App.navigate('topics');
+          } else {
+            submitBtn.disabled = false;
+            submitBtn.textContent = isSignUp ? t('auth.createAccount') : t('auth.signIn');
+          }
+        }, 3000);
       } catch (e) {
         showErr(mapAuthError(e));
         submitBtn.disabled = false;
