@@ -13,11 +13,15 @@
 //      Copy the URL from the top of the page (e.g.
 //      https://teaching-app-3959a-default-rtdb.asia-southeast1.firebasedatabase.app)
 //      and paste it into databaseURL below.
-//   3. Realtime Database → Rules tab → paste these rules and Publish:
+//   3. Realtime Database → Rules tab → paste these rules and Publish.
+//      NOTE: a .read rule MUST exist on the /users node itself for
+//      teachers to bulk-list students. Without it the Class dashboard
+//      fails silently with PERMISSION_DENIED.
 //
 //        {
 //          "rules": {
 //            "users": {
+//              ".read":  "auth != null && root.child('teachers').child(auth.uid).val() == true",
 //              "$uid": {
 //                ".read":  "auth != null && (auth.uid == $uid || root.child('teachers').child(auth.uid).val() == true)",
 //                ".write": "auth != null && auth.uid == $uid"

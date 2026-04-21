@@ -181,20 +181,36 @@
 
   // --- Teacher read ---
   async function listAllStudents() {
-    if (!enabled() || !currentUser) return [];
-    if (!isTeacher(currentUser)) return [];
+    if (!enabled() || !currentUser) {
+      console.log('[FirebaseSync] listAllStudents: not signed in');
+      return { students: [], error: 'not-signed-in' };
+    }
+    if (!isTeacher(currentUser)) {
+      console.log('[FirebaseSync] listAllStudents: not a teacher (email=' + currentUser.email + ')');
+      return { students: [], error: 'not-teacher' };
+    }
     try {
-      const snap = await db.ref('users').once('value');
+      const snap = await withTimeout(
+        db.ref('users').once('value'),
+        6000,
+        'Teacher list read'
+      );
       const val = snap.val() || {};
-      return Object.keys(val).map((id) => ({
+      const students = Object.keys(val).map((id) => ({
         id,
         profile: val[id].profile || { id, name: id },
         progress: val[id].progress || Storage.emptyProgress(),
         updatedAt: val[id].updatedAt || 0,
       }));
+      console.log('[FirebaseSync] listAllStudents ok, ' + students.length + ' students');
+      return { students, error: null };
     } catch (e) {
       console.warn('[FirebaseSync] list failed', e);
-      return [];
+      const code = (e && (e.code || e.message)) || '';
+      let kind = 'error';
+      if (/permission/i.test(code) || /PERMISSION/i.test(code)) kind = 'permission-denied';
+      else if (/timed out/i.test(code)) kind = 'timeout';
+      return { students: [], error: kind, raw: String(code) };
     }
   }
 

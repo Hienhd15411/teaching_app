@@ -786,9 +786,34 @@
     const loadList = async () => {
       const content = appEl.querySelector('#classContent');
       content.innerHTML = `<div class="empty-state" style="padding:30px 20px;">${t('class.loading')}</div>`;
-      const students = await FirebaseSync.listAllStudents();
-      lastStudents = students;
-      paintList(students);
+      const result = await FirebaseSync.listAllStudents();
+      lastStudents = result.students || [];
+      if (result.error === 'permission-denied') {
+        content.className = 'empty-state';
+        content.style.padding = '30px 20px';
+        content.innerHTML = `
+          <div style="font-size:40px;margin-bottom:8px;">🔒</div>
+          <h2 style="margin:0 0 6px;">Permission denied</h2>
+          <p style="color:var(--text-muted);max-width:580px;margin:0 auto 12px;line-height:1.5;">
+            Rules Firebase đang chặn. Cần update rules để teacher được đọc <code>/users</code>:
+          </p>
+          <pre style="text-align:left;background:var(--bg-soft);padding:14px;border-radius:10px;font-size:12px;max-width:600px;margin:0 auto;overflow:auto;">${t('class.fixRulesSample')}</pre>
+        `;
+        return;
+      }
+      if (result.error === 'timeout') {
+        content.className = 'empty-state';
+        content.style.padding = '30px 20px';
+        content.innerHTML = `⏱️ Database read timed out. Check databaseURL region in js/firebase-config.js.`;
+        return;
+      }
+      if (result.error === 'not-teacher') {
+        content.className = 'empty-state';
+        content.style.padding = '30px 20px';
+        content.innerHTML = `Chỉ giáo viên mới xem được. Email hiện tại không có trong TEACHER_EMAILS.`;
+        return;
+      }
+      paintList(lastStudents);
     };
 
     let lastStudents = [];
