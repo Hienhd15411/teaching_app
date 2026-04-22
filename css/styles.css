@@ -1015,6 +1015,9 @@ input[type="text"]:focus { border-color: var(--primary); }
   .progress-table .mini-bar { width: 60px; }
 }
 
+/* Class dashboard email column can be long; wrap gracefully */
+.progress-table td.muted { font-size: 12px; word-break: break-all; max-width: 220px; }
+
 .history-chart {
   display: flex;
   align-items: flex-end;

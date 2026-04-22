@@ -856,6 +856,7 @@
         <tr>
           <td>${idx + 1}</td>
           <td>${escapeHtml(r.s.profile.avatar || '🙂')} <strong>${escapeHtml(r.s.profile.name || r.s.id)}</strong></td>
+          <td class="muted">${escapeHtml(r.s.profile.email || '')}</td>
           <td class="num">${r.level}</td>
           <td class="num">${r.xp}</td>
           <td class="num">🔥 ${r.streak}</td>
@@ -872,6 +873,7 @@
             <tr>
               <th>#</th>
               <th>${t('class.student')}</th>
+              <th>${t('class.email')}</th>
               <th class="num">${t('class.level')}</th>
               <th class="num">${t('class.xp')}</th>
               <th class="num">${t('class.streak')}</th>
@@ -892,7 +894,7 @@
 
   function exportClassCsv(students) {
     if (!students || !students.length) return;
-    const header = ['id', 'name', 'level', 'xp', 'streak', 'wordsSeen', 'mastered', 'updatedAt'];
+    const header = ['id', 'name', 'email', 'level', 'xp', 'streak', 'wordsSeen', 'mastered', 'updatedAt'];
     const rows = [header.join(',')];
     students.forEach((s) => {
       const p = s.progress || {};
@@ -902,6 +904,7 @@
       rows.push([
         csvCell(s.id),
         csvCell(s.profile && s.profile.name || ''),
+        csvCell(s.profile && s.profile.email || ''),
         p.level || 1,
         p.xp || 0,
         p.streak || 0,
