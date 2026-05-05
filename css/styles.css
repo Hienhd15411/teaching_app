@@ -631,6 +631,18 @@ input[type="text"]:focus { border-color: var(--primary); }
 .flashcard .example { color: var(--body-muted); font-style: italic; font-size: 14px; }
 .flashcard .hint { color: var(--body-muted); font-size: 12px; margin-top: 14px; }
 
+/* word-extras default styles target light surfaces; when nested inside
+   the dark flashcard we re-color them so they stay readable. */
+.flashcard .word-extras .row,
+.flashcard .word-extras .row .label { color: var(--body-muted); }
+.flashcard .word-extras .row .value { color: var(--body-on-dark); }
+.flashcard .word-extras .syn-list span,
+.flashcard .word-extras .ant-list span {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  border-color: transparent;
+}
+
 .rate-row { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
 .rate-btn {
   flex: 1;
