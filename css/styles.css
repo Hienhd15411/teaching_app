@@ -350,6 +350,7 @@ input[type="text"]:focus { border-color: var(--primary); }
 .btn.secondary {
   background: var(--bg-soft);
   border: 1px solid var(--border);
+  color: var(--ink);
 }
 .btn.secondary:hover:not(:disabled) { background: var(--border); }
 .btn.danger { background: var(--danger); }
