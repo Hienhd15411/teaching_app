@@ -224,5 +224,95 @@
       },
       sources: ['Business Result U4, U12, U15, U16'],
     },
+    {
+      id: 'hobbies_freetime',
+      icon: '🎨',
+      title: { vi: 'Sở thích & Thời gian rảnh', en: 'Hobbies & Free Time' },
+      desc: {
+        vi: 'Vẽ, làm vườn, nhiếp ảnh, đan len, sưu tầm.',
+        en: 'Drawing, gardening, photography, knitting, collecting.',
+      },
+    },
+    {
+      id: 'sports_fitness',
+      icon: '🏃',
+      title: { vi: 'Thể thao & Thể hình', en: 'Sports & Fitness' },
+      desc: {
+        vi: 'Phòng gym, chạy bộ, bơi, các môn đồng đội.',
+        en: 'Gym, running, swimming, team sports.',
+      },
+    },
+    {
+      id: 'music_arts',
+      icon: '🎵',
+      title: { vi: 'Âm nhạc & Nghệ thuật', en: 'Music & Arts' },
+      desc: {
+        vi: 'Nhạc cụ, hoà nhạc, bảo tàng, triển lãm.',
+        en: 'Instruments, concerts, museums, exhibitions.',
+      },
+    },
+    {
+      id: 'cooking_recipes',
+      icon: '🍳',
+      title: { vi: 'Nấu ăn & Công thức', en: 'Cooking & Recipes' },
+      desc: {
+        vi: 'Hành động bếp, nguyên liệu, gia vị, công thức.',
+        en: 'Kitchen actions, ingredients, seasoning, recipes.',
+      },
+    },
+    {
+      id: 'money_banking',
+      icon: '🏦',
+      title: { vi: 'Tiền & Ngân hàng', en: 'Money & Banking' },
+      desc: {
+        vi: 'Tài khoản, ATM, vay, lãi, tiết kiệm.',
+        en: 'Accounts, ATMs, loans, interest, savings.',
+      },
+    },
+    {
+      id: 'emergencies_safety',
+      icon: '🚨',
+      title: { vi: 'Khẩn cấp & An toàn', en: 'Emergencies & Safety' },
+      desc: {
+        vi: 'Cảnh sát, cứu thương, tai nạn, sơ cứu.',
+        en: 'Police, ambulance, accidents, first aid.',
+      },
+    },
+    {
+      id: 'directions_navigation',
+      icon: '🧭',
+      title: { vi: 'Chỉ đường & Định vị', en: 'Directions & Navigation' },
+      desc: {
+        vi: 'Hướng, ngã tư, bản đồ, GPS, mốc địa lý.',
+        en: 'Cardinal directions, intersections, maps, GPS, landmarks.',
+      },
+    },
+    {
+      id: 'customer_service',
+      icon: '🛎️',
+      title: { vi: 'Chăm sóc khách hàng', en: 'Customer Service' },
+      desc: {
+        vi: 'Khiếu nại, hoàn tiền, đổi hàng, bảo hành.',
+        en: 'Complaints, refunds, exchanges, warranties.',
+      },
+    },
+    {
+      id: 'interviews_career',
+      icon: '👔',
+      title: { vi: 'Phỏng vấn & Nghề nghiệp', en: 'Interviews & Career' },
+      desc: {
+        vi: 'CV, kỹ năng, câu hỏi phỏng vấn, lương thưởng.',
+        en: 'Résumés, skills, interview questions, salaries.',
+      },
+    },
+    {
+      id: 'environment_climate',
+      icon: '🌱',
+      title: { vi: 'Môi trường & Khí hậu', en: 'Environment & Climate' },
+      desc: {
+        vi: 'Tái chế, ô nhiễm, biến đổi khí hậu, năng lượng tái tạo.',
+        en: 'Recycling, pollution, climate change, renewable energy.',
+      },
+    },
   ];
 })(window);
