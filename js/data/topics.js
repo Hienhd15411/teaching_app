@@ -314,5 +314,25 @@
         en: 'Recycling, pollution, climate change, renewable energy.',
       },
     },
+    {
+      id: 'business_actions',
+      icon: '⚙️',
+      title: { vi: 'Hành động trong công việc', en: 'Business Actions' },
+      desc: {
+        vi: 'Động từ và cụm động từ thường gặp trong môi trường công việc.',
+        en: 'Verbs and verb phrases common in professional work.',
+      },
+      sources: ['ETS TOEIC vocabulary'],
+    },
+    {
+      id: 'business_concepts',
+      icon: '📊',
+      title: { vi: 'Khái niệm trong kinh doanh', en: 'Business Concepts' },
+      desc: {
+        vi: 'Danh từ, tính từ trừu tượng dùng trong công việc và TOEIC.',
+        en: 'Abstract nouns and adjectives used in business and TOEIC.',
+      },
+      sources: ['ETS TOEIC vocabulary'],
+    },
   ];
 })(window);
