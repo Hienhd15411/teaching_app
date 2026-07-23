@@ -397,22 +397,24 @@
       return;
     }
 
-    // Topic breakdown — only topics that have been played, as a data table.
-    const playedTopics = TOPICS
-      .map((topic) => {
-        const pt = progress.perTopic[topic.id];
+    // Topic breakdown — every played topic, including TOEIC virtual topics.
+    const playedTopics = Object.keys(progress.perTopic || {})
+      .map((tid) => {
+        const pt = progress.perTopic[tid];
         if (!pt || pt.attempts === 0) return null;
-        const words = VOCAB[topic.id] || [];
-        const tStats = SRS.topicStats(progress, topic.id, words);
+        const meta = resolveTopicMeta(tid);
+        if (!meta) return null;
+        const tStats = SRS.topicStats(progress, tid, meta.words);
         const accuracy = pt.correct + pt.wrong > 0
           ? Math.round((pt.correct / (pt.correct + pt.wrong)) * 100)
           : 0;
         const lastPlayedDays = pt.lastPlayedAt
           ? Math.max(0, Math.floor((Date.now() - pt.lastPlayedAt) / 86400000))
           : null;
-        return { topic, words, tStats, pt, accuracy, lastPlayedDays };
+        return { topic: meta.def, toeic: meta.toeic, words: meta.words, tStats, pt, accuracy, lastPlayedDays };
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort((a, b) => (b.pt.lastPlayedAt || 0) - (a.pt.lastPlayedAt || 0));
 
     const topicTable = playedTopics.length === 0
       ? `<div class="empty-state" style="padding:20px;">${t('progress.noTopicsPlayed')}</div>`
@@ -428,8 +430,8 @@
             </tr>
           </thead>
           <tbody>
-            ${playedTopics.map(({ topic, tStats, pt, accuracy, lastPlayedDays }) => `
-              <tr class="clickable" data-topic="${topic.id}">
+            ${playedTopics.map(({ topic, toeic, tStats, pt, accuracy, lastPlayedDays }) => `
+              <tr class="clickable" data-topic="${topic.id}"${toeic ? ` data-toeic-ed="${toeic.editionId}" data-toeic-part="${toeic.partId}"` : ''}>
                 <td>${topic.icon} ${escapeHtml(topic.title[lang])}</td>
                 <td>
                   <span class="mini-bar"><span style="width:${tStats.masteryPct}%"></span></span>
@@ -450,9 +452,10 @@
       const sepIdx = key.indexOf('::');
       const topicId = key.slice(0, sepIdx);
       const en = key.slice(sepIdx + 2);
-      const topicDef = TOPICS.find((x) => x.id === topicId);
-      const word = (VOCAB[topicId] || []).find((w) => w.en.toLowerCase() === en);
-      if (!word || !topicDef) return;
+      const meta = resolveTopicMeta(topicId);
+      const word = meta ? meta.words.find((w) => w.en.toLowerCase() === en) : null;
+      if (!word || !meta) return;
+      const topicDef = meta.def;
       const struggleScore = state.wrong * 3 + (6 - state.box);
       if (state.box <= 2 || state.wrong > 0) {
         reviewCandidates.push({ word, state, topicId, topicDef, struggleScore });
@@ -552,7 +555,12 @@
     `;
 
     appEl.querySelectorAll('.progress-table tr.clickable[data-topic]').forEach((r) => {
-      r.addEventListener('click', () => navigate('topic', { topicId: r.getAttribute('data-topic') }));
+      r.addEventListener('click', () => {
+        const ed = r.getAttribute('data-toeic-ed');
+        const part = r.getAttribute('data-toeic-part');
+        if (ed && part) navigate('toeic-part', { editionId: ed, partId: part });
+        else navigate('topic', { topicId: r.getAttribute('data-topic') });
+      });
     });
 
     appEl.querySelector('#exportBtn').addEventListener('click', () => {
@@ -657,6 +665,35 @@
 
   function toeicTopicId(editionId, partId) {
     return 'toeic_' + editionId + '_' + partId;
+  }
+
+  // Resolve a perTopic/perWord topicId — regular topic or TOEIC virtual id
+  // ('toeic_<edition>_<part>') — to a display definition + word list.
+  // Progress scans must use this instead of TOPICS.find, otherwise TOEIC
+  // study sessions are invisible in the Progress view.
+  function resolveTopicMeta(topicId) {
+    const topic = TOPICS.find((x) => x.id === topicId);
+    if (topic) return { def: topic, words: VOCAB[topicId] || [], toeic: null };
+    const m = /^toeic_([^_]+)_(.+)$/.exec(topicId || '');
+    if (m && typeof TOEIC !== 'undefined') {
+      const ed = TOEIC.EDITIONS.find((e) => e.id === m[1]);
+      const part = TOEIC.PARTS.find((p) => p.id === m[2]);
+      if (ed && part) {
+        return {
+          def: {
+            id: topicId,
+            icon: part.icon,
+            title: {
+              vi: part.title.vi + ' · ' + ed.label,
+              en: part.title.en + ' · ' + ed.label,
+            },
+          },
+          words: TOEIC.allWordsInPart(ed.id, part.id),
+          toeic: { editionId: ed.id, partId: part.id },
+        };
+      }
+    }
+    return null;
   }
 
   function renderToeicPart(editionId, partId) {
@@ -1150,21 +1187,68 @@
       localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
     }
 
-    // Merge progress: never downgrade local. If cloud has more XP than
-    // local, trust cloud; otherwise keep local and push back up.
+    // Merge progress field-by-field. A winner-takes-all comparison on XP
+    // silently dropped the smaller side's perWord/history when both devices
+    // had studied; union-merging keeps every word's best state instead.
     if (cloudProgress) {
       const localProgress = Storage.getProgress(user.uid);
-      const localXp = localProgress.xp || 0;
-      const cloudXp = cloudProgress.xp || 0;
-      if (cloudXp > localXp) {
-        localStorage.setItem('vlt_progress_' + user.uid, JSON.stringify(cloudProgress));
-      } else if (localXp > cloudXp) {
-        // Local is ahead — schedule a push so cloud catches up.
+      const merged = mergeProgress(localProgress, Storage.normalizeProgress(cloudProgress));
+      localStorage.setItem('vlt_progress_' + user.uid, JSON.stringify(merged));
+      if ((merged.xp || 0) > (cloudProgress.xp || 0)) {
+        // Local contributed something cloud lacked — push the merge back up.
         FirebaseSync.scheduleProgressPush();
       }
-      // Equal XP: assume they match, leave local alone.
     }
     renderHeader();
+  }
+
+  function mergeProgress(a, b) {
+    const out = Storage.emptyProgress();
+    out.xp = Math.max(a.xp || 0, b.xp || 0);
+    out.level = Math.max(a.level || 1, b.level || 1);
+    out.streak = Math.max(a.streak || 0, b.streak || 0);
+    out.lastActiveDate = [a.lastActiveDate, b.lastActiveDate].filter(Boolean).sort().pop() || null;
+    out.badges = Array.from(new Set([].concat(a.badges || [], b.badges || [])));
+
+    const wordKeys = new Set([].concat(Object.keys(a.perWord || {}), Object.keys(b.perWord || {})));
+    wordKeys.forEach((k) => {
+      const wa = (a.perWord || {})[k];
+      const wb = (b.perWord || {})[k];
+      if (!wa) { out.perWord[k] = wb; return; }
+      if (!wb) { out.perWord[k] = wa; return; }
+      out.perWord[k] = {
+        box: Math.max(wa.box || 1, wb.box || 1),
+        correct: Math.max(wa.correct || 0, wb.correct || 0),
+        wrong: Math.max(wa.wrong || 0, wb.wrong || 0),
+        lastReviewed: Math.max(wa.lastReviewed || 0, wb.lastReviewed || 0),
+      };
+    });
+
+    const topicKeys = new Set([].concat(Object.keys(a.perTopic || {}), Object.keys(b.perTopic || {})));
+    topicKeys.forEach((k) => {
+      const ta = (a.perTopic || {})[k];
+      const tb = (b.perTopic || {})[k];
+      if (!ta) { out.perTopic[k] = tb; return; }
+      if (!tb) { out.perTopic[k] = ta; return; }
+      out.perTopic[k] = {
+        attempts: Math.max(ta.attempts || 0, tb.attempts || 0),
+        correct: Math.max(ta.correct || 0, tb.correct || 0),
+        wrong: Math.max(ta.wrong || 0, tb.wrong || 0),
+        lastPlayedAt: Math.max(ta.lastPlayedAt || 0, tb.lastPlayedAt || 0),
+      };
+    });
+
+    const seenTs = new Set();
+    out.history = [].concat(a.history || [], b.history || [])
+      .filter((h) => {
+        if (!h || seenTs.has(h.ts)) return false;
+        seenTs.add(h.ts);
+        return true;
+      })
+      .sort((x, y) => (x.ts || 0) - (y.ts || 0))
+      .slice(-300);
+
+    return out;
   }
 
   function syncClassNav() {

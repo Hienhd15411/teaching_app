@@ -13,6 +13,15 @@
     let bestCombo = 0;
     const startTs = Date.now();
 
+    // Held at start() scope so exiting mid-feedback tears down the
+    // document-level keydown listener and its arming timer.
+    let fbTimer = null;
+    let fbKeyHandler = null;
+    function clearFeedbackArm() {
+      if (fbTimer) { clearTimeout(fbTimer); fbTimer = null; }
+      if (fbKeyHandler) { document.removeEventListener('keydown', fbKeyHandler); fbKeyHandler = null; }
+    }
+
     function renderHud() {
       const pct = Math.round((idx / words.length) * 100);
       return `
@@ -30,8 +39,9 @@
     function render() {
       if (idx >= words.length) return finish();
       const w = words[idx];
+      const hintWord = w.en.replace(/\s*\([^)]*\)/g, '').replace(/\s*\+.*$/, '').trim();
       const posHint = w.pos
-        ? `<div class="pos-hint">(${escapeHtml(w.pos)}) · ${escapeHtml(w.en.length + '')} ${t('word.letters') || 'letters'}</div>`
+        ? `<div class="pos-hint">(${escapeHtml(w.pos)}) · ${escapeHtml(hintWord.length + '')} ${t('word.letters') || 'letters'}</div>`
         : '';
 
       container.innerHTML = `
@@ -49,7 +59,10 @@
         </section>
       `;
 
-      container.querySelector('#exitBtn').addEventListener('click', onExit);
+      container.querySelector('#exitBtn').addEventListener('click', () => {
+        clearFeedbackArm();
+        onExit();
+      });
       const input = container.querySelector('#typingInput');
       const submitBtn = container.querySelector('#submitBtn');
       input.focus();
@@ -67,6 +80,26 @@
       return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
     }
 
+    // Some imported entries carry grammar hints in the headword, e.g.
+    // "Capable (of)", "Fill out/in", "Prove + adj". Accept the plain word
+    // (and each slash alternative) as a correct answer too.
+    function answerKeys(en) {
+      const base = normalize(en);
+      const keys = new Set([base]);
+      const noParen = normalize(base.replace(/\([^)]*\)/g, ' '));
+      if (noParen) keys.add(noParen);
+      const noPlus = normalize(base.replace(/\+.*$/, ''));
+      if (noPlus) keys.add(noPlus);
+      if (base.includes('/')) {
+        const m = base.match(/^(.*?)(\S+)\/(\S+)(.*)$/);
+        if (m) {
+          keys.add(normalize(m[1] + m[2] + m[4]));
+          keys.add(normalize(m[1] + m[3] + m[4]));
+        }
+      }
+      return keys;
+    }
+
     function check() {
       const w = words[idx];
       const input = container.querySelector('#typingInput');
@@ -74,7 +107,7 @@
       const answer = normalize(input.value);
       if (!answer) return;
 
-      const isCorrect = answer === normalize(w.en);
+      const isCorrect = answerKeys(w.en).has(answer);
       const progress = Storage.getProgress();
       SRS.updateWord(progress, topicId, w.en, isCorrect);
       Storage.saveProgress(progress);
@@ -130,10 +163,9 @@
 
       const nextEl = feedback.querySelector('#nextBtn');
       let armed = false;
-      let armTimer = null;
+      clearFeedbackArm();
       const advance = () => {
-        if (armTimer) { clearTimeout(armTimer); armTimer = null; }
-        document.removeEventListener('keydown', onKey);
+        clearFeedbackArm();
         idx += 1;
         render();
       };
@@ -141,6 +173,7 @@
         if (!armed) return;
         if (e.key === 'Enter') { e.preventDefault(); advance(); }
       };
+      fbKeyHandler = onKey;
       nextEl.addEventListener('click', advance);
       // Deliberately do NOT focus nextEl. If focus lands on a button and
       // the user's Enter key (the same one that submitted) is still pressed
@@ -148,14 +181,15 @@
       // focused button — advancing immediately and skipping feedback.
       // Arm the Enter-to-advance listener only after 400ms so the original
       // submit keystroke has fully unwound.
-      armTimer = setTimeout(() => {
+      fbTimer = setTimeout(() => {
         armed = true;
-        armTimer = null;
+        fbTimer = null;
         document.addEventListener('keydown', onKey);
       }, 400);
     }
 
     function finish() {
+      clearFeedbackArm();
       onFinish({
         correct,
         wrong,

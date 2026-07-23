@@ -1,8 +1,9 @@
 (function (global) {
   'use strict';
 
-  // 12 topics balancing daily conversation (English Vocabulary in Use Pre-Int)
-  // and workplace communication (Business Result Pre-Int).
+  // 34 topics: daily conversation (English Vocabulary in Use Pre-Int),
+  // workplace communication (Business Result Pre-Int), and business/TOEIC
+  // topics imported from the teacher's ETS vocabulary list.
   global.TOPICS = [
     {
       id: 'intro_people',

@@ -163,17 +163,18 @@
     if (!profile || profile.id !== currentUser.uid) return;
     const progress = Storage.getProgress(profile.id);
     try {
-      await db.ref('users/' + currentUser.uid).update({
-        profile: {
-          id: profile.id,
-          name: profile.name,
-          email: currentUser.email || '',
-          avatar: profile.avatar || '🙂',
-          createdAt: profile.createdAt || Date.now(),
-        },
+      const update = {
+        'profile/id': profile.id,
+        'profile/name': profile.name,
+        'profile/email': currentUser.email || '',
+        'profile/avatar': profile.avatar || '🙂',
         progress: progress,
         updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      });
+      };
+      // Only write createdAt when the local profile actually has one —
+      // otherwise every push resets the cloud's original signup timestamp.
+      if (profile.createdAt) update['profile/createdAt'] = profile.createdAt;
+      await db.ref('users/' + currentUser.uid).update(update);
     } catch (e) {
       console.warn('[FirebaseSync] push failed', e);
     }

@@ -51,7 +51,8 @@
     if (getActiveProfileId() === id) {
       localStorage.removeItem(ACTIVE_KEY);
     }
-    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()
+        && typeof FirebaseSync.deleteProfile === 'function') {
       FirebaseSync.deleteProfile(id);
     }
   }
@@ -84,10 +85,26 @@
     };
   }
 
+  // Back-fill any keys missing from older schemas or hand-imported JSON so
+  // downstream code (progress.js, srs.js) can rely on the full shape.
+  function normalizeProgress(p) {
+    const base = emptyProgress();
+    if (!p || typeof p !== 'object') return base;
+    if (typeof p.xp !== 'number') p.xp = base.xp;
+    if (typeof p.level !== 'number') p.level = base.level;
+    if (typeof p.streak !== 'number') p.streak = base.streak;
+    if (!('lastActiveDate' in p)) p.lastActiveDate = base.lastActiveDate;
+    if (!Array.isArray(p.badges)) p.badges = base.badges;
+    if (!p.perWord || typeof p.perWord !== 'object') p.perWord = base.perWord;
+    if (!p.perTopic || typeof p.perTopic !== 'object') p.perTopic = base.perTopic;
+    if (!Array.isArray(p.history)) p.history = base.history;
+    return p;
+  }
+
   function getProgress(profileId) {
     const id = profileId || getActiveProfileId();
     if (!id) return emptyProgress();
-    return readJSON(PROGRESS_PREFIX + id, emptyProgress());
+    return normalizeProgress(readJSON(PROGRESS_PREFIX + id, emptyProgress()));
   }
 
   function saveProgress(progress, profileId) {
@@ -139,5 +156,6 @@
     exportProfile,
     importProfile,
     emptyProgress,
+    normalizeProgress,
   };
 })(window);

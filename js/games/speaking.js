@@ -101,6 +101,15 @@
     let isListening = false;
     const startTs = Date.now();
 
+    // Held at start() scope so exiting mid-feedback tears down the
+    // document-level keydown listener and its arming timer.
+    let fbTimer = null;
+    let fbKeyHandler = null;
+    function clearFeedbackArm() {
+      if (fbTimer) { clearTimeout(fbTimer); fbTimer = null; }
+      if (fbKeyHandler) { document.removeEventListener('keydown', fbKeyHandler); fbKeyHandler = null; }
+    }
+
     function renderHud() {
       const pct = Math.round((idx / words.length) * 100);
       return `
@@ -143,6 +152,7 @@
 
       container.querySelector('#exitBtn').addEventListener('click', () => {
         stopListening();
+        clearFeedbackArm();
         onExit();
       });
       container.querySelector('#micBtn').addEventListener('click', toggleMic);
@@ -306,10 +316,9 @@
 
       const nextEl = feedback.querySelector('#nextBtn');
       let armed = false;
-      let armTimer = null;
+      clearFeedbackArm();
       const advance = () => {
-        if (armTimer) { clearTimeout(armTimer); armTimer = null; }
-        document.removeEventListener('keydown', onKey);
+        clearFeedbackArm();
         idx += 1;
         render();
       };
@@ -317,16 +326,18 @@
         if (!armed) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); advance(); }
       };
+      fbKeyHandler = onKey;
       nextEl.addEventListener('click', advance);
-      armTimer = setTimeout(() => {
+      fbTimer = setTimeout(() => {
         armed = true;
-        armTimer = null;
+        fbTimer = null;
         document.addEventListener('keydown', onKey);
       }, 400);
     }
 
     function finish() {
       stopListening();
+      clearFeedbackArm();
       onFinish({
         correct: correct + close, // count close as correct for XP/stats
         wrong,

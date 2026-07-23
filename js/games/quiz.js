@@ -24,6 +24,16 @@
     let locked = false;
     const startTs = Date.now();
 
+    // Document-level keydown arming for the feedback "Next" step. Held at
+    // start() scope so exiting mid-feedback can tear it down — otherwise the
+    // listener survives navigation and re-renders the game over other views.
+    let fbTimer = null;
+    let fbKeyHandler = null;
+    function clearFeedbackArm() {
+      if (fbTimer) { clearTimeout(fbTimer); fbTimer = null; }
+      if (fbKeyHandler) { document.removeEventListener('keydown', fbKeyHandler); fbKeyHandler = null; }
+    }
+
     // For each word, precompute question direction (50% en→vi, 50% vi→en) and options
     const questions = words.map((w) => {
       const enToVi = Math.random() < 0.5;
@@ -69,7 +79,10 @@
         </section>
       `;
       locked = false;
-      container.querySelector('#exitBtn').addEventListener('click', onExit);
+      container.querySelector('#exitBtn').addEventListener('click', () => {
+        clearFeedbackArm();
+        onExit();
+      });
       container.querySelectorAll('.quiz-option').forEach((btn) => {
         btn.addEventListener('click', () => onPick(btn, q));
       });
@@ -143,10 +156,9 @@
 
       const nextEl = feedback.querySelector('#nextBtn');
       let armed = false;
-      let armTimer = null;
+      clearFeedbackArm();
       const advance = () => {
-        if (armTimer) { clearTimeout(armTimer); armTimer = null; }
-        document.removeEventListener('keydown', onKey);
+        clearFeedbackArm();
         idx += 1;
         render();
       };
@@ -154,18 +166,20 @@
         if (!armed) return;
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); advance(); }
       };
+      fbKeyHandler = onKey;
       nextEl.addEventListener('click', advance);
       // Do NOT focus the Next button — if focus lands on it while the
       // user's Enter/Space from the option pick is still being processed,
       // the browser fires a synthetic click and skips the feedback.
-      armTimer = setTimeout(() => {
+      fbTimer = setTimeout(() => {
         armed = true;
-        armTimer = null;
+        fbTimer = null;
         document.addEventListener('keydown', onKey);
       }, 400);
     }
 
     function finish() {
+      clearFeedbackArm();
       onFinish({
         correct,
         wrong,
