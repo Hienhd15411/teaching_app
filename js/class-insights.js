@@ -30,8 +30,12 @@
     return { icon: '📘', title: { vi: topicId, en: topicId } };
   }
 
-  function analyze(student, lang) {
+  // audience: 'teacher' (default) phrases suggestions as coaching actions
+  // for the teacher; 'student' phrases them as self-directed nudges shown
+  // in the student's own Progress view.
+  function analyze(student, lang, audience) {
     const L = lang === 'en' ? 'en' : 'vi';
+    const forStudent = audience === 'student';
     const p = (student && student.progress) || {};
     const perTopic = p.perTopic || {};
     const perWord = p.perWord || {};
@@ -101,29 +105,51 @@
     const suggestions = [];
     if (weakTopics.length) {
       const wt = weakTopics[0];
-      suggestions.push(L === 'vi'
-        ? 'Kèm thêm ' + wt.title.vi + ' — độ chính xác ' + wt.accuracy + '%'
-        : 'Extra coaching on ' + wt.title.en + ' — ' + wt.accuracy + '% accuracy');
+      if (forStudent) {
+        suggestions.push(L === 'vi'
+          ? '🎯 Tập trung thêm ' + wt.title.vi + ' — độ chính xác mới ' + wt.accuracy + '%'
+          : '🎯 Focus more on ' + wt.title.en + ' — accuracy is only ' + wt.accuracy + '%');
+      } else {
+        suggestions.push(L === 'vi'
+          ? 'Kèm thêm ' + wt.title.vi + ' — độ chính xác ' + wt.accuracy + '%'
+          : 'Extra coaching on ' + wt.title.en + ' — ' + wt.accuracy + '% accuracy');
+      }
     }
     if (inactiveDays != null && inactiveDays >= 3) {
+      if (forStudent) {
+        suggestions.push(L === 'vi'
+          ? '⏰ Bạn chưa học ' + inactiveDays + ' ngày rồi — quay lại nhé!'
+          : '⏰ You have not studied for ' + inactiveDays + ' days — come back!');
+      } else {
+        suggestions.push(L === 'vi'
+          ? 'Chưa học ' + inactiveDays + ' ngày — nhắn nhắc nhé'
+          : 'Inactive for ' + inactiveDays + ' days — send a nudge');
+      }
+    } else if (forStudent && (p.streak || 0) > 0 && inactiveDays != null && inactiveDays >= 1) {
       suggestions.push(L === 'vi'
-        ? 'Chưa học ' + inactiveDays + ' ngày — nhắn nhắc nhé'
-        : 'Inactive for ' + inactiveDays + ' days — send a nudge');
+        ? '🔥 Học 1 phiên hôm nay để giữ chuỗi ' + p.streak + ' ngày!'
+        : '🔥 Do one session today to keep your ' + p.streak + '-day streak!');
     }
     if (stuckWords.length >= 5) {
-      suggestions.push(L === 'vi'
-        ? stuckWords.length + ' từ kẹt ở Box 1-2 — giao bài ôn lại'
-        : stuckWords.length + ' words stuck in Box 1-2 — assign a review round');
+      if (forStudent) {
+        suggestions.push(L === 'vi'
+          ? '🩹 ' + stuckWords.length + ' từ đang kẹt — xem mục "Từ cần ôn" bên dưới'
+          : '🩹 ' + stuckWords.length + ' words are stuck — see "Words to review" below');
+      } else {
+        suggestions.push(L === 'vi'
+          ? stuckWords.length + ' từ kẹt ở Box 1-2 — giao bài ôn lại'
+          : stuckWords.length + ' words stuck in Box 1-2 — assign a review round');
+      }
     }
     if (!suggestions.length && hasActivity) {
-      suggestions.push(L === 'vi'
-        ? 'Đang học đều và tốt — khen một câu 👏'
-        : 'Consistent and doing well — send some praise 👏');
+      suggestions.push(forStudent
+        ? (L === 'vi' ? '🚀 Bạn đang học rất đều — tiếp tục phát huy!' : '🚀 You are on a great rhythm — keep it up!')
+        : (L === 'vi' ? 'Đang học đều và tốt — khen một câu 👏' : 'Consistent and doing well — send some praise 👏'));
     }
     if (!hasActivity) {
-      suggestions.push(L === 'vi'
-        ? 'Chưa bắt đầu học — hướng dẫn buổi đầu'
-        : 'Has not started yet — walk them through the first session');
+      suggestions.push(forStudent
+        ? (L === 'vi' ? 'Chọn một chủ đề và chơi phiên đầu tiên nhé!' : 'Pick a topic and play your first session!')
+        : (L === 'vi' ? 'Chưa bắt đầu học — hướng dẫn buổi đầu' : 'Has not started yet — walk them through the first session'));
     }
 
     return { accuracy, inactiveDays, weakTopics, stuckWords, riskScore: risk, riskLevel, suggestions };

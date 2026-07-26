@@ -504,9 +504,31 @@
       return `<span class="badge ${earned ? 'earned' : ''}">${b.emoji} ${t(b.nameKey)}</span>`;
     }).join('');
 
+    // Personal coaching banner — same engine as the teacher dashboard,
+    // phrased as self-directed nudges.
+    let coachHtml = '';
+    let coachWeakTopic = null;
+    if (typeof ClassInsights !== 'undefined') {
+      const selfInsights = ClassInsights.analyze({ progress, updatedAt: Date.now() }, lang, 'student');
+      coachWeakTopic = selfInsights.weakTopics.length ? selfInsights.weakTopics[0] : null;
+      const items = selfInsights.suggestions.slice(0, 3);
+      if (items.length) {
+        const cta = coachWeakTopic
+          ? `<button class="btn" id="coachGoBtn" style="margin-top:10px;">${t('progress.coachGo')}</button>`
+          : '';
+        coachHtml = `
+          <div class="coach-banner">
+            <div class="coach-title">${t('progress.coachTitle')}</div>
+            <ul class="coach-list">${items.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>
+            ${cta}
+          </div>`;
+      }
+    }
+
     appEl.innerHTML = `
       <section class="view">
         <h1>${t('progress.title')}</h1>
+        ${coachHtml}
 
         <div class="progress-grid">
           <div class="stat-card">
@@ -562,6 +584,15 @@
         else navigate('topic', { topicId: r.getAttribute('data-topic') });
       });
     });
+
+    const coachGoBtn = appEl.querySelector('#coachGoBtn');
+    if (coachGoBtn && coachWeakTopic) {
+      coachGoBtn.addEventListener('click', () => {
+        const meta = resolveTopicMeta(coachWeakTopic.id);
+        if (meta && meta.toeic) navigate('toeic-part', { editionId: meta.toeic.editionId, partId: meta.toeic.partId });
+        else navigate('topic', { topicId: coachWeakTopic.id });
+      });
+    }
 
     appEl.querySelector('#exportBtn').addEventListener('click', () => {
       const data = Storage.exportProfile();

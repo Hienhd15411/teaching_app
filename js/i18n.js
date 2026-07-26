@@ -195,6 +195,8 @@
       'progress.topicCol': 'Chủ đề',
       'progress.masteryCol': 'Thạo',
       'progress.accuracyCol': 'Đúng',
+      'progress.coachTitle': '💡 Gợi ý cho bạn tuần này',
+      'progress.coachGo': 'Ôn ngay →',
 
       'grammar.soon': 'Phần ngữ pháp đang được xây dựng. Hẹn gặp lại!',
 
@@ -402,6 +404,8 @@
       'progress.topicCol': 'Topic',
       'progress.masteryCol': 'Mastered',
       'progress.accuracyCol': 'Accuracy',
+      'progress.coachTitle': '💡 Suggestions for you this week',
+      'progress.coachGo': 'Practice now →',
 
       'grammar.soon': 'Grammar lessons coming soon. Stay tuned!',
 
