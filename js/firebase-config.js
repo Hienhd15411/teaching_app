@@ -61,4 +61,14 @@
   global.TEACHER_EMAILS = [
     'lemytrinh1801@gmail.com',
   ];
+
+  // Sales-demo accounts. Create the account in Firebase Console
+  // (Authentication → Users → Add user) with a matching email, then give
+  // prospects the email + password. On first sign-in the app seeds ~2
+  // weeks of realistic study history (js/demo-seed.js), and the Class
+  // dashboard shows fabricated students instead of real ones — demo
+  // accounts never see real student emails or progress.
+  global.DEMO_ACCOUNTS = [
+    'demo@vocabquest.app',
+  ];
 })(window);

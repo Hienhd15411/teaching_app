@@ -823,6 +823,17 @@
     const loadList = async () => {
       const content = appEl.querySelector('#classContent');
       content.innerHTML = `<div class="empty-state" style="padding:30px 20px;">${t('class.loading')}</div>`;
+      // Demo accounts see a fabricated roster — never real student data.
+      const demoUser = FirebaseSync.getCurrentUser();
+      if (typeof DemoSeed !== 'undefined' && DemoSeed.isDemoUser(demoUser) && !FirebaseSync.isTeacher(demoUser)) {
+        lastStudents = DemoSeed.listDemoStudents();
+        paintList(lastStudents);
+        const note = document.createElement('div');
+        note.style.cssText = 'margin-top:10px;font-size:12px;color:var(--text-muted);';
+        note.textContent = '🧪 Dữ liệu minh hoạ cho tài khoản demo — không phải học viên thật.';
+        content.appendChild(note);
+        return;
+      }
       const result = await FirebaseSync.listAllStudents();
       lastStudents = result.students || [];
       if (result.error === 'permission-denied') {
@@ -1120,6 +1131,7 @@
           // the background and updates the UI when it finishes.
           ensureLocalProfileForUser(user);
           Storage.setActiveProfile(user.uid);
+          if (typeof DemoSeed !== 'undefined') DemoSeed.maybeSeed(user);
           renderHeader();
           syncClassNav();
           if (currentView === 'profile' || !currentView) navigate('topics');
@@ -1258,6 +1270,8 @@
     if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
       const u = FirebaseSync.getCurrentUser();
       if (u && FirebaseSync.isTeacher(u)) showClass = true;
+      // Demo accounts get the dashboard too — with fabricated students.
+      if (u && typeof DemoSeed !== 'undefined' && DemoSeed.isDemoUser(u)) showClass = true;
     } else {
       // No cloud — hide class tab entirely.
       showClass = false;
