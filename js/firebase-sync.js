@@ -231,6 +231,7 @@
     listAllStudents,
     hasRealConfig,
     sdkLoaded,
+    getDb: function () { return db; },
   };
 
   if (enabled()) init();

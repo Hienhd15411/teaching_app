@@ -231,5 +231,144 @@
     });
   }
 
-  global.DemoSeed = { maybeSeed, isDemoUser, listDemoStudents };
+  // ---- Fabricated tuition state for the billing/attendance demo ----
+  //
+  // Mirrors the /billing + /groups + /billing_settings shape and exposes a
+  // Billing-compatible api that mutates it in memory, so a prospect can
+  // click through điểm danh / đóng tiền and see live updates without ever
+  // touching Firebase.
+  let demoBillingState = null;
+
+  function buildDemoBilling() {
+    const now = Date.now();
+    const day = 86400000;
+    const d = (offset) => ymd(new Date(now - offset * day));
+
+    function attendanceLog(count, startOffset, everyDays, counted) {
+      const out = {};
+      for (let i = 0; i < count; i++) {
+        out[d(startOffset + i * everyDays)] = { status: 'present', counted: counted !== false, ts: now - (startOffset + i * everyDays) * day };
+      }
+      return out;
+    }
+    function payments(list) {
+      const out = {};
+      list.forEach((p, i) => { out['pay' + i] = Object.assign({ ts: now - (p.off || 0) * day }, p, { date: d(p.off || 0) }); });
+      return out;
+    }
+
+    const groups = {
+      g_toeic: {
+        name: 'Nhóm TOEIC tối',
+        ratePerSession: 150000,
+        packageSize: 8,
+        schedule: { tue: '18:00', fri: '18:00' },
+        members: { 'demo-student-2': true, 'demo-student-5': true, 'demo-student-6': true, 'demo-student-7': true },
+      },
+    };
+
+    const billing = {
+      'demo-student-1': { // Minh Anh — 1-1 khoẻ mạnh
+        plan: { type: '1v1', ratePerSession: 250000, packageSize: 8 },
+        schedule: { tue: '17:00', sat: '9:00' },
+        payments: payments([{ sessions: 8, amount: 2000000, off: 40 }, { sessions: 8, amount: 2000000, off: 12 }]),
+        attendance: attendanceLog(11, 2, 3),
+      },
+      'demo-student-2': { // Hồng Ngọc — nhóm
+        plan: { type: 'group', groupId: 'g_toeic' },
+        payments: payments([{ sessions: 8, amount: 1200000, off: 20 }]),
+        attendance: attendanceLog(5, 1, 3),
+      },
+      'demo-student-3': { // Tuấn Kiệt — 1-1
+        plan: { type: '1v1', ratePerSession: 200000, packageSize: 8 },
+        schedule: { mon: '19:00', thu: '19:00' },
+        payments: payments([{ sessions: 8, amount: 1600000, off: 15 }]),
+        attendance: attendanceLog(4, 2, 3),
+      },
+      'demo-student-4': { // Khánh Linh — 1-1, còn 2 buổi → sắp phải thu
+        plan: { type: '1v1', ratePerSession: 220000, packageSize: 8 },
+        schedule: { wed: '18:00' },
+        payments: payments([{ sessions: 8, amount: 1760000, off: 45 }]),
+        attendance: attendanceLog(6, 3, 6),
+      },
+      'demo-student-5': { // Gia Hân — nhóm
+        plan: { type: 'group', groupId: 'g_toeic' },
+        payments: payments([{ sessions: 8, amount: 1200000, off: 18 }]),
+        attendance: attendanceLog(4, 2, 3),
+      },
+      'demo-student-6': { // Quang Huy — nhóm, có 1 buổi vắng bị trừ
+        plan: { type: 'group', groupId: 'g_toeic' },
+        payments: payments([{ sessions: 8, amount: 1200000, off: 18 }]),
+        attendance: Object.assign(attendanceLog(4, 4, 3), { [d(1)]: { status: 'absent', counted: true, ts: now - day } }),
+      },
+      'demo-student-7': { // Thu Hà — nhóm, còn 1 buổi
+        plan: { type: 'group', groupId: 'g_toeic' },
+        payments: payments([{ sessions: 8, amount: 1200000, off: 30 }]),
+        attendance: attendanceLog(7, 2, 3),
+      },
+      'demo-student-8': { // Đức Anh — 1-1, học vượt gói → âm 1 buổi
+        plan: { type: '1v1', ratePerSession: 300000, packageSize: 8 },
+        schedule: { sat: '15:00' },
+        payments: payments([{ sessions: 8, amount: 2400000, off: 60 }]),
+        attendance: attendanceLog(9, 3, 6),
+      },
+      // demo-student-9 (Mai Phương) & 10 (Hoàng Nam): chưa cấu hình — hiện khu 🔴
+    };
+
+    return {
+      billing,
+      groups,
+      settings: (typeof Billing !== 'undefined') ? Billing.normalizeSettings(null) : { countRules: {} },
+    };
+  }
+
+  function getDemoBillingApi() {
+    if (!demoBillingState) demoBillingState = buildDemoBilling();
+    const st = demoBillingState;
+    const ok = () => Promise.resolve();
+    return {
+      fetchAll: () => Promise.resolve(st),
+      saveStudentPlan: (uid, plan, schedule) => {
+        const b = st.billing[uid] = st.billing[uid] || {};
+        b.plan = plan;
+        if (schedule !== undefined) b.schedule = schedule;
+        return ok();
+      },
+      addPayment: (uid, payment) => {
+        const b = st.billing[uid] = st.billing[uid] || {};
+        b.payments = b.payments || {};
+        b.payments['pay' + Date.now()] = Object.assign({ ts: Date.now() }, payment);
+        return ok();
+      },
+      deletePayment: (uid, pid) => {
+        if (st.billing[uid] && st.billing[uid].payments) delete st.billing[uid].payments[pid];
+        return ok();
+      },
+      markAttendance: (uid, date, status, planType, settings) => {
+        const b = st.billing[uid] = st.billing[uid] || {};
+        b.attendance = b.attendance || {};
+        const existing = b.attendance[date];
+        if (existing && existing.status === status) {
+          delete b.attendance[date];
+        } else {
+          b.attendance[date] = { status, counted: Billing.shouldCount(status, planType, settings), ts: Date.now() };
+        }
+        return ok();
+      },
+      saveGroup: (gid, data) => {
+        const key = gid || ('g_' + Date.now());
+        st.groups[key] = data;
+        return Promise.resolve(key);
+      },
+      deleteGroup: (gid) => { delete st.groups[gid]; return ok(); },
+      saveSettings: (settings) => { st.settings = Billing.normalizeSettings(settings); return ok(); },
+    };
+  }
+
+  // The demo student's own tuition (for the reminder banner on Tiến độ).
+  function myDemoBilling() {
+    return { plan: { type: '1v1' }, remaining: 2 };
+  }
+
+  global.DemoSeed = { maybeSeed, isDemoUser, listDemoStudents, getDemoBillingApi, myDemoBilling };
 })(window);

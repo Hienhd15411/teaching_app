@@ -594,6 +594,8 @@
       });
     }
 
+    appendTuitionReminder();
+
     appEl.querySelector('#exportBtn').addEventListener('click', () => {
       const data = Storage.exportProfile();
       if (!data) return;
@@ -626,6 +628,45 @@
       };
       reader.readAsText(file);
     });
+  }
+
+  // Async: pull the signed-in student's own /billing node and, when the
+  // prepaid package is nearly used up, append a reminder line to the coach
+  // banner (creating the banner if the view rendered without one).
+  async function appendTuitionReminder() {
+    if (typeof FirebaseSync === 'undefined' || !FirebaseSync.enabled()) return;
+    const user = FirebaseSync.getCurrentUser();
+    if (!user) return;
+
+    let remaining = null;
+    if (typeof DemoSeed !== 'undefined' && DemoSeed.isDemoUser(user)) {
+      remaining = DemoSeed.myDemoBilling().remaining;
+    } else if (typeof Billing !== 'undefined') {
+      const b = await Billing.fetchMine(user.uid);
+      if (!b || !b.plan || Billing.paidSessions(b) === 0) return;
+      remaining = Billing.remaining(b);
+    }
+    if (remaining == null || remaining > 2) return;
+
+    // View may have changed while we were fetching.
+    const view = appEl.querySelector('.view');
+    if (!view || !appEl.querySelector('.progress-grid')) return;
+
+    const msg = remaining <= 0
+      ? I18N.t('bill.remindOut')
+      : I18N.t('bill.remindLow').replace('{n}', remaining);
+
+    let list = appEl.querySelector('.coach-banner .coach-list');
+    if (!list) {
+      const banner = document.createElement('div');
+      banner.className = 'coach-banner';
+      banner.innerHTML = `<div class="coach-title">${I18N.t('progress.coachTitle')}</div><ul class="coach-list"></ul>`;
+      view.insertBefore(banner, appEl.querySelector('.progress-grid'));
+      list = banner.querySelector('.coach-list');
+    }
+    const li = document.createElement('li');
+    li.textContent = msg;
+    list.appendChild(li);
   }
 
   // ========== TOEIC views ==========
@@ -818,6 +859,8 @@
   }
 
   // ========== Class (teacher) dashboard ==========
+  let classTab = 'progress'; // survives tab re-renders within the session
+
   function renderClass() {
     const t = I18N.t;
 
@@ -846,6 +889,11 @@
             <button class="btn secondary" id="refreshClassBtn">↻ ${t('class.refresh')}</button>
             <button class="btn secondary" id="exportClassBtn">⬇️ ${t('class.exportCsv')}</button>
           </div>
+        </div>
+        <div class="auth-tabs class-tabs">
+          <button class="auth-tab ${classTab === 'progress' ? 'active' : ''}" data-tab="progress">${t('class.tabProgress')}</button>
+          <button class="auth-tab ${classTab === 'billing' ? 'active' : ''}" data-tab="billing">💰 ${t('class.tabBilling')}</button>
+          <button class="auth-tab ${classTab === 'attendance' ? 'active' : ''}" data-tab="attendance">✓ ${t('class.tabAttendance')}</button>
         </div>
         <div id="classContent" class="empty-state" style="padding:30px 20px;">${t('class.loading')}</div>
       </section>
@@ -1006,9 +1054,70 @@
       });
     };
 
-    appEl.querySelector('#refreshClassBtn').addEventListener('click', loadList);
+    const isDemoView = () => {
+      const u = FirebaseSync.getCurrentUser();
+      return typeof DemoSeed !== 'undefined' && DemoSeed.isDemoUser(u) && !FirebaseSync.isTeacher(u);
+    };
+
+    const loadBillingTab = async (kind) => {
+      const content = appEl.querySelector('#classContent');
+      content.className = '';
+      content.style.padding = '0';
+      content.innerHTML = `<div class="empty-state" style="padding:30px 20px;">${t('class.loading')}</div>`;
+
+      let students;
+      let api;
+      let data;
+      if (isDemoView()) {
+        students = DemoSeed.listDemoStudents();
+        api = DemoSeed.getDemoBillingApi();
+        data = await api.fetchAll();
+      } else {
+        if (!lastStudents.length) {
+          const result = await FirebaseSync.listAllStudents();
+          lastStudents = result.students || [];
+        }
+        students = lastStudents;
+        api = Billing;
+        try {
+          data = await Billing.fetchAll();
+        } catch (e) {
+          content.className = 'empty-state';
+          content.style.padding = '30px 20px';
+          content.innerHTML = `🔒 ${t('bill.rulesMissing')}`;
+          return;
+        }
+      }
+
+      const ctx = {
+        students,
+        data,
+        api,
+        lang: I18N.getLang(),
+        reload: async () => {
+          ctx.data = await api.fetchAll();
+          if (kind === 'billing') BillingUI.renderBillingTab(content, ctx);
+          else BillingUI.renderAttendanceTab(content, ctx);
+        },
+      };
+      if (kind === 'billing') BillingUI.renderBillingTab(content, ctx);
+      else BillingUI.renderAttendanceTab(content, ctx);
+    };
+
+    const showTab = (tab) => {
+      classTab = tab;
+      appEl.querySelectorAll('.class-tabs .auth-tab').forEach((b) =>
+        b.classList.toggle('active', b.getAttribute('data-tab') === tab));
+      if (tab === 'progress') loadList();
+      else loadBillingTab(tab);
+    };
+
+    appEl.querySelectorAll('.class-tabs .auth-tab').forEach((b) => {
+      b.addEventListener('click', () => showTab(b.getAttribute('data-tab')));
+    });
+    appEl.querySelector('#refreshClassBtn').addEventListener('click', () => showTab(classTab));
     appEl.querySelector('#exportClassBtn').addEventListener('click', () => exportClassCsv(lastStudents));
-    loadList();
+    showTab(classTab);
   }
 
   function openStudentDetail(row, lang) {
