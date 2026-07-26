@@ -128,32 +128,87 @@
   // renderClass/paintList/exportClassCsv work unchanged. Numbers are
   // varied on purpose: a couple of stars, a mid pack, one struggling
   // student and one inactive — the spread a prospect expects to manage.
+  // Each student carries per-topic rollups tuned so the coaching insights
+  // ("Cần quan tâm", accuracy column, weak-topic drill-down) have a story
+  // to tell: stars, a mid pack, one low-accuracy student (Đức Anh 43% on
+  // TOEIC Part 1 — the sales-pitch example), one fading, one inactive.
   const DEMO_STUDENTS = [
-    { name: 'Minh Anh',   avatar: '🦊', level: 8, xp: 6420, streak: 12, seen: 210, mastered: 150, daysAgo: 0 },
-    { name: 'Bảo Ngọc',   avatar: '🐰', level: 7, xp: 5310, streak: 9,  seen: 185, mastered: 122, daysAgo: 0 },
-    { name: 'Tuấn Kiệt',  avatar: '🐯', level: 6, xp: 4150, streak: 5,  seen: 160, mastered: 96,  daysAgo: 1 },
-    { name: 'Khánh Linh', avatar: '🐱', level: 5, xp: 3240, streak: 4,  seen: 130, mastered: 71,  daysAgo: 1 },
-    { name: 'Gia Hân',    avatar: '🐼', level: 5, xp: 2980, streak: 3,  seen: 118, mastered: 64,  daysAgo: 2 },
-    { name: 'Quang Huy',  avatar: '🦁', level: 4, xp: 2210, streak: 2,  seen: 95,  mastered: 41,  daysAgo: 2 },
-    { name: 'Thu Hà',     avatar: '🐨', level: 4, xp: 1980, streak: 0,  seen: 88,  mastered: 35,  daysAgo: 4 },
-    { name: 'Đức Anh',    avatar: '🐸', level: 3, xp: 1320, streak: 0,  seen: 60,  mastered: 18,  daysAgo: 5 },
-    { name: 'Mai Phương', avatar: '🐣', level: 2, xp: 640,  streak: 0,  seen: 34,  mastered: 6,   daysAgo: 8 },
-    { name: 'Hoàng Nam',  avatar: '🐢', level: 1, xp: 180,  streak: 0,  seen: 12,  mastered: 1,   daysAgo: 12 },
+    { name: 'Minh Anh',   avatar: '🦊', level: 8, xp: 6420, streak: 12, seen: 210, mastered: 150, daysAgo: 0,
+      topics: [{ id: 'toeic_2023_part1', acc: 88, att: 12 }, { id: 'office_jobs', acc: 90, att: 8 }, { id: 'intro_people', acc: 92, att: 6 }] },
+    { name: 'Bảo Ngọc',   avatar: '🐰', level: 7, xp: 5310, streak: 9,  seen: 185, mastered: 122, daysAgo: 0,
+      topics: [{ id: 'toeic_2023_part5', acc: 82, att: 10 }, { id: 'food_restaurants', acc: 86, att: 7 }] },
+    { name: 'Tuấn Kiệt',  avatar: '🐯', level: 6, xp: 4150, streak: 5,  seen: 160, mastered: 96,  daysAgo: 1,
+      topics: [{ id: 'toeic_2023_part1', acc: 78, att: 9 }, { id: 'travel_hotels', acc: 74, att: 5 }] },
+    { name: 'Khánh Linh', avatar: '🐱', level: 5, xp: 3240, streak: 4,  seen: 130, mastered: 71,  daysAgo: 1,
+      topics: [{ id: 'business_actions', acc: 76, att: 6 }, { id: 'meetings_phone', acc: 81, att: 4 }] },
+    { name: 'Gia Hân',    avatar: '🐼', level: 5, xp: 2980, streak: 3,  seen: 118, mastered: 64,  daysAgo: 2,
+      topics: [{ id: 'toeic_2023_part5', acc: 71, att: 7 }, { id: 'shopping_money', acc: 79, att: 4 }] },
+    { name: 'Quang Huy',  avatar: '🦁', level: 4, xp: 2210, streak: 2,  seen: 95,  mastered: 41,  daysAgo: 2,
+      topics: [{ id: 'toeic_2023_part1', acc: 62, att: 8 }, { id: 'intro_people', acc: 75, att: 3 }] },
+    { name: 'Thu Hà',     avatar: '🐨', level: 4, xp: 1980, streak: 0,  seen: 88,  mastered: 35,  daysAgo: 4,
+      topics: [{ id: 'food_restaurants', acc: 72, att: 6 }, { id: 'toeic_2024_part3', acc: 68, att: 3 }] },
+    { name: 'Đức Anh',    avatar: '🐸', level: 3, xp: 1320, streak: 0,  seen: 60,  mastered: 18,  daysAgo: 5,
+      topics: [{ id: 'toeic_2023_part1', acc: 43, att: 9 }, { id: 'office_jobs', acc: 58, att: 4 }] },
+    { name: 'Mai Phương', avatar: '🐣', level: 2, xp: 640,  streak: 0,  seen: 34,  mastered: 6,   daysAgo: 8,
+      topics: [{ id: 'intro_people', acc: 64, att: 4 }] },
+    { name: 'Hoàng Nam',  avatar: '🐢', level: 1, xp: 180,  streak: 0,  seen: 12,  mastered: 1,   daysAgo: 12,
+      topics: [{ id: 'intro_people', acc: 70, att: 2 }] },
   ];
+
+  const ROSTER_WORD_TOPICS = ['intro_people', 'food_restaurants', 'office_jobs', 'travel_hotels', 'toeic_2023_part1', 'toeic_2023_part5'];
 
   function listDemoStudents() {
     const now = Date.now();
     const day = 86400000;
     return DEMO_STUDENTS.map((s, i) => {
+      // perWord over real vocabulary so stuck-word pills show real words.
+      // Weak students (low first-topic accuracy) get repeat-miss words.
+      const struggling = s.topics[0].acc < 65;
       const perWord = {};
       for (let w = 0; w < s.seen; w++) {
-        perWord['demo_topic::word' + w] = {
-          box: w < s.mastered ? 4 + (w % 2) : (w % 3) + 1,
+        const topicId = ROSTER_WORD_TOPICS[w % ROSTER_WORD_TOPICS.length];
+        const list = wordsFor(topicId);
+        const word = list[Math.floor(w / ROSTER_WORD_TOPICS.length) % (list.length || 1)];
+        if (!word) continue;
+        const isMastered = w < s.mastered;
+        perWord[topicId + '::' + word.en.toLowerCase()] = {
+          box: isMastered ? 4 + (w % 2) : (w % 2) + 1,
           correct: 2 + (w % 4),
-          wrong: w % 2,
+          wrong: isMastered ? 0 : (struggling && w % 3 === 0 ? 2 + (w % 2) : w % 2),
           lastReviewed: now - (w % 10) * day,
         };
       }
+
+      // perTopic rollups from the accuracy spec.
+      const perTopic = {};
+      const history = [];
+      s.topics.forEach((tp, ti) => {
+        const total = tp.att * 10;
+        const correct = Math.round(total * tp.acc / 100);
+        perTopic[tp.id] = {
+          attempts: tp.att,
+          correct,
+          wrong: total - correct,
+          lastPlayedAt: now - (s.daysAgo + ti) * day,
+        };
+        // A few history rows per topic so the 14-day chart has bars.
+        const sessions = Math.min(tp.att, 4);
+        for (let k = 0; k < sessions; k++) {
+          const ts = now - (s.daysAgo + ti + k * 2) * day + k * 3600000;
+          const c = Math.max(1, Math.round(10 * tp.acc / 100) - (k % 2));
+          history.push({
+            date: ymd(new Date(ts)),
+            ts,
+            mode: MODES[(i + k) % MODES.length],
+            topic: tp.id,
+            correct: c,
+            wrong: 10 - c,
+            xp: c * 10,
+          });
+        }
+      });
+      history.sort((a, b) => a.ts - b.ts);
+
       return {
         id: 'demo-student-' + (i + 1),
         profile: {
@@ -167,8 +222,8 @@
           xp: s.xp,
           streak: s.streak,
           perWord,
-          perTopic: {},
-          history: [],
+          perTopic,
+          history,
           badges: [],
         },
         updatedAt: now - s.daysAgo * day,

@@ -1128,6 +1128,75 @@ input[type="text"]:focus { border-color: var(--primary); }
 /* Class dashboard email column can be long; wrap gracefully */
 .progress-table td.muted { font-size: 12px; word-break: break-all; max-width: 220px; }
 
+/* ===== Class dashboard: coaching insights ===== */
+.attn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+.attn-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warning);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.attn-card:hover { transform: translateY(-2px); }
+.attn-card.high { border-left-color: var(--danger); }
+.attn-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.attn-chip {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.attn-chip.high { background: rgba(185, 28, 28, 0.12); color: var(--danger); }
+.attn-chip.watch { background: rgba(178, 94, 0, 0.12); color: var(--warning); }
+.attn-suggestion { font-size: 13px; color: var(--ink-muted-80); line-height: 1.4; }
+.attn-empty {
+  background: rgba(26, 140, 58, 0.08);
+  border: 1px solid rgba(26, 140, 58, 0.3);
+  color: var(--success);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+.progress-table .acc-ok { color: var(--success); font-weight: 600; }
+.progress-table .acc-warn { color: var(--warning); font-weight: 700; }
+.progress-table .acc-bad { color: var(--danger); font-weight: 700; }
+.acc-warn { color: var(--warning); font-weight: 700; }
+.acc-bad { color: var(--danger); font-weight: 700; }
+
+.modal.student-detail { max-width: 640px; }
+.detail-h { font-size: 15px; margin: 18px 0 4px; }
+.detail-suggestions {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.stuck-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.stuck-pill {
+  background: var(--bg-soft);
+  border: 1px solid rgba(185, 28, 28, 0.35);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+.stuck-pill em { color: var(--danger); font-style: normal; font-weight: 700; margin-left: 2px; }
+.muted-note { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
 .history-chart {
   display: flex;
   align-items: flex-end;

@@ -877,7 +877,9 @@
       content.className = '';
       content.style.padding = '0';
 
-      // Enrich each student with computed stats
+      const lang = I18N.getLang();
+
+      // Enrich each student with computed stats + coaching insights
       const rows = students.map((s) => {
         const p = s.progress || {};
         const wordsSeen = Object.keys(p.perWord || {}).length;
@@ -887,7 +889,10 @@
         const xp = p.xp || 0;
         const level = p.level || 1;
         const lastMs = s.updatedAt || 0;
-        return { s, p, wordsSeen, mastered, streak, xp, level, lastMs };
+        const insights = (typeof ClassInsights !== 'undefined')
+          ? ClassInsights.analyze(s, lang)
+          : { accuracy: null, riskLevel: 'ok', riskScore: 0, suggestions: [], weakTopics: [], stuckWords: [], inactiveDays: null };
+        return { s, p, wordsSeen, mastered, streak, xp, level, lastMs, insights };
       });
 
       // Default sort: XP descending
@@ -900,13 +905,37 @@
         return days + ' ' + t('class.daysAgo');
       };
 
+      // "Needs attention" cards — worst risk first, top 6.
+      const flagged = rows
+        .filter((r) => r.insights.riskLevel !== 'ok')
+        .sort((a, b) => b.insights.riskScore - a.insights.riskScore)
+        .slice(0, 6);
+      const attnHtml = flagged.length === 0
+        ? `<div class="attn-empty">${t('class.allGood')}</div>`
+        : `<div class="attn-grid">${flagged.map((r) => `
+            <div class="attn-card ${r.insights.riskLevel}" data-student="${escapeHtml(r.s.id)}">
+              <div class="attn-head">
+                <span>${escapeHtml(r.s.profile.avatar || '🙂')} <strong>${escapeHtml(r.s.profile.name || r.s.id)}</strong></span>
+                <span class="attn-chip ${r.insights.riskLevel}">${t('class.risk.' + r.insights.riskLevel)}</span>
+              </div>
+              <div class="attn-suggestion">${escapeHtml(r.insights.suggestions[0] || '')}</div>
+            </div>
+          `).join('')}</div>`;
+
+      const accCell = (ins) => {
+        if (ins.accuracy == null) return '<td class="num muted">—</td>';
+        const cls = ins.accuracy < 50 ? 'acc-bad' : ins.accuracy < 65 ? 'acc-warn' : 'acc-ok';
+        return `<td class="num ${cls}">${ins.accuracy}%</td>`;
+      };
+
       const body = rows.map((r, idx) => `
-        <tr>
+        <tr class="clickable" data-student="${escapeHtml(r.s.id)}">
           <td>${idx + 1}</td>
           <td>${escapeHtml(r.s.profile.avatar || '🙂')} <strong>${escapeHtml(r.s.profile.name || r.s.id)}</strong></td>
           <td class="muted">${escapeHtml(r.s.profile.email || '')}</td>
           <td class="num">${r.level}</td>
           <td class="num">${r.xp}</td>
+          ${accCell(r.insights)}
           <td class="num">🔥 ${r.streak}</td>
           <td class="num">${r.wordsSeen}</td>
           <td class="num">${r.mastered}</td>
@@ -915,7 +944,9 @@
       `).join('');
 
       content.innerHTML = `
-        <div style="color:var(--text-muted);font-size:13px;margin-bottom:10px;">${students.length} ${t('class.totalStudents')}</div>
+        <h3 style="margin:4px 0 10px;">${t('class.attention')}</h3>
+        ${attnHtml}
+        <div style="color:var(--text-muted);font-size:13px;margin:18px 0 10px;">${students.length} ${t('class.totalStudents')} · ${t('class.clickRow')}</div>
         <table class="progress-table">
           <thead>
             <tr>
@@ -924,6 +955,7 @@
               <th>${t('class.email')}</th>
               <th class="num">${t('class.level')}</th>
               <th class="num">${t('class.xp')}</th>
+              <th class="num">${t('class.accuracyCol')}</th>
               <th class="num">${t('class.streak')}</th>
               <th class="num">${t('class.wordsSeen')}</th>
               <th class="num">${t('class.mastered')}</th>
@@ -933,11 +965,103 @@
           <tbody>${body}</tbody>
         </table>
       `;
+
+      const openById = (id) => {
+        const row = rows.find((r) => r.s.id === id);
+        if (row) openStudentDetail(row, lang);
+      };
+      content.querySelectorAll('[data-student]').forEach((el) => {
+        el.addEventListener('click', () => openById(el.getAttribute('data-student')));
+      });
     };
 
     appEl.querySelector('#refreshClassBtn').addEventListener('click', loadList);
     appEl.querySelector('#exportClassBtn').addEventListener('click', () => exportClassCsv(lastStudents));
     loadList();
+  }
+
+  function openStudentDetail(row, lang) {
+    const t = I18N.t;
+    const { s, insights, level, xp, streak, wordsSeen, mastered } = row;
+    const p = s.progress || {};
+
+    const chip = (label, value) =>
+      `<span class="chip" style="background:var(--bg-soft);padding:6px 12px;border-radius:999px;font-size:13px;">${label}: <strong>${value}</strong></span>`;
+
+    const suggestionsHtml = insights.suggestions.length
+      ? `<ul class="detail-suggestions">${insights.suggestions.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`
+      : '';
+
+    const weakHtml = insights.weakTopics.length
+      ? `<table class="progress-table" style="margin-top:6px;">
+          <thead><tr>
+            <th>${t('progress.topicCol')}</th>
+            <th class="num">${t('class.attempts')}</th>
+            <th class="num">${t('class.accuracyCol')}</th>
+          </tr></thead>
+          <tbody>${insights.weakTopics.map((w) => `
+            <tr>
+              <td>${w.icon} ${escapeHtml(w.title[lang] || w.title.vi)}</td>
+              <td class="num">${w.attempts}</td>
+              <td class="num ${w.accuracy < 50 ? 'acc-bad' : 'acc-warn'}">${w.accuracy}%</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`
+      : `<div class="muted-note">${t('class.noWeakTopics')}</div>`;
+
+    const stuck = insights.stuckWords.slice(0, 16);
+    const stuckHtml = stuck.length
+      ? `<div class="stuck-list">${stuck.map((w) =>
+          `<span class="stuck-pill">${w.icon} ${escapeHtml(w.en)} <em>✗${w.wrong}</em></span>`).join('')}</div>`
+      : `<div class="muted-note">${t('class.noStuckWords')}</div>`;
+
+    // 14-day activity bars from history.
+    const hist = Array.isArray(p.history) ? p.history : [];
+    const byDate = {};
+    hist.forEach((h) => { byDate[h.date] = (byDate[h.date] || 0) + (h.correct || 0) + (h.wrong || 0); });
+    let maxV = 1;
+    Object.values(byDate).forEach((v) => { if (v > maxV) maxV = v; });
+    const bars = [];
+    const today = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const ds = d.toISOString().slice(0, 10);
+      const v = byDate[ds] || 0;
+      const h = Math.round((v / maxV) * 100);
+      bars.push(`<div class="history-bar" style="height:${Math.max(h, v ? 8 : 2)}%;opacity:${v ? 1 : 0.15}" data-tip="${ds}: ${v}"></div>`);
+    }
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal student-detail">
+        <div class="modal-head">
+          <h2>${escapeHtml(s.profile.avatar || '🙂')} ${escapeHtml(s.profile.name || s.id)}</h2>
+          <button class="icon-btn" id="closeDetail" title="Close">✕</button>
+        </div>
+        <p class="modal-sub">${escapeHtml(s.profile.email || '')}</p>
+        <div class="btn-row" style="margin-bottom:14px;">
+          ${chip(t('class.level'), level)}
+          ${chip('XP', xp)}
+          ${chip(t('class.streak'), '🔥 ' + streak)}
+          ${chip(t('class.accuracyCol'), insights.accuracy == null ? '—' : insights.accuracy + '%')}
+          ${chip(t('class.mastered'), mastered + '/' + wordsSeen)}
+        </div>
+        <h3 class="detail-h">${t('class.suggestions')}</h3>
+        ${suggestionsHtml}
+        <h3 class="detail-h">${t('class.weakTopics')}</h3>
+        ${weakHtml}
+        <h3 class="detail-h">${t('class.stuckWords')}</h3>
+        ${stuckHtml}
+        <h3 class="detail-h">${t('class.activity14')}</h3>
+        <div class="history-chart" style="margin-top:6px;">${bars.join('')}</div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('#closeDetail').addEventListener('click', close);
   }
 
   function exportClassCsv(students) {
