@@ -97,6 +97,100 @@
 
   // ================= Học phí tab =================
 
+  function shortVnd(v) {
+    if (v >= 1000000) return (Math.round(v / 100000) / 10) + 'tr';
+    if (v >= 1000) return Math.round(v / 1000) + 'k';
+    return String(v || 0);
+  }
+
+  // Overview cards + 6-month income chart, computed from payments and
+  // roster metadata. "Đã dạy chưa thu" = overdrawn sessions × rate.
+  function renderOverview(students, billing, groups) {
+    const now = new Date();
+    const curKey = now.toISOString().slice(0, 7);
+    const monthKeyOf = (y, m) => y + '-' + String(m + 1).padStart(2, '0');
+
+    const byMonth = {};
+    let totalIncome = 0;
+    let taughtUnpaid = 0;
+    let configured = 0;
+    students.forEach((s) => {
+      const b = billing[s.id];
+      if (!b || !b.plan) return;
+      configured += 1;
+      Object.values(b.payments || {}).forEach((p) => {
+        totalIncome += p.amount || 0;
+        const k = (p.date || '').slice(0, 7);
+        if (k) byMonth[k] = (byMonth[k] || 0) + (p.amount || 0);
+      });
+      const rem = Billing.remaining(b);
+      if (rem < 0) {
+        const ep = Billing.effectivePlan(b, groups);
+        taughtUnpaid += (-rem) * (ep.ratePerSession || 0);
+      }
+    });
+
+    const lastD = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+    const lastKey = monthKeyOf(lastD.getFullYear(), lastD.getMonth());
+    const curIncome = byMonth[curKey] || 0;
+    const lastIncome = byMonth[lastKey] || 0;
+    const delta = lastIncome > 0 ? Math.round(((curIncome - lastIncome) / lastIncome) * 100) : null;
+
+    let newThisMonth = 0;
+    students.forEach((s) => {
+      const c = s.profile && s.profile.createdAt;
+      if (c && new Date(c).toISOString().slice(0, 7) === curKey) newThisMonth += 1;
+    });
+
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 15);
+      const key = monthKeyOf(d.getFullYear(), d.getMonth());
+      months.push({ key, label: 'T' + (d.getMonth() + 1), value: byMonth[key] || 0 });
+    }
+    let maxV = 1;
+    months.forEach((m) => { if (m.value > maxV) maxV = m.value; });
+
+    const chart = `
+      <div class="income-chart">
+        ${months.map((m) => `
+          <div class="income-col" title="${m.label}: ${Billing.fmtVnd(m.value)}">
+            <div class="income-val">${m.value ? shortVnd(m.value) : ''}</div>
+            <div class="income-bar-zone"><div class="income-bar" style="height:${Math.max(Math.round((m.value / maxV) * 100), m.value ? 6 : 2)}%"></div></div>
+            <div class="income-label">${m.label}</div>
+          </div>`).join('')}
+      </div>`;
+
+    return `
+      <h3 style="margin:0 0 10px;">📊 ${t('bill.overview')}</h3>
+      <div class="progress-grid" style="margin-bottom:14px;">
+        <div class="stat-card">
+          <div class="label">${t('bill.studentsCard')}</div>
+          <div class="value">${students.length}</div>
+          <div class="hint">${configured} ${t('bill.configuredHint')} · 🆕 ${newThisMonth} ${t('bill.newThisMonth')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">${t('bill.incomeThisMonth')}</div>
+          <div class="value">${shortVnd(curIncome)}</div>
+          <div class="hint">${delta == null ? Billing.fmtVnd(curIncome) : (delta >= 0 ? '▲ +' : '▼ ') + delta + '% ' + t('bill.vsLastMonth')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">${t('bill.incomeTotal')}</div>
+          <div class="value">${shortVnd(totalIncome)}</div>
+          <div class="hint">${Billing.fmtVnd(totalIncome)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">${t('bill.taughtUnpaid')}</div>
+          <div class="value" style="${taughtUnpaid > 0 ? 'color:var(--danger);' : ''}">${shortVnd(taughtUnpaid)}</div>
+          <div class="hint">${taughtUnpaid > 0 ? Billing.fmtVnd(taughtUnpaid) : t('bill.taughtUnpaidOk')}</div>
+        </div>
+      </div>
+      <div class="stat-card" style="margin-bottom:18px;">
+        <div class="label">${t('bill.incomeChart')}</div>
+        ${chart}
+      </div>`;
+  }
+
   function renderBillingTab(container, ctx) {
     const { students, data, lang } = ctx;
     const { billing, groups, settings } = data;
@@ -155,6 +249,7 @@
       : `<div class="attn-empty" style="margin-bottom:16px;">${t('bill.noneDue')}</div>`;
 
     container.innerHTML = `
+      ${renderOverview(students, billing, groups)}
       <div class="bill-toolbar">
         <h3 style="margin:0;">${t('bill.collectSoon')}</h3>
         <button class="btn secondary" id="billSettingsBtn">⚙️ ${t('bill.rules')}</button>
