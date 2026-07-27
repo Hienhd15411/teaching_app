@@ -1278,7 +1278,10 @@ input[type="text"]:focus { border-color: var(--primary); }
   align-items: flex-end;
   margin-top: 10px;
 }
-.income-col { flex: 1; text-align: center; min-width: 0; }
+.income-col { flex: 1; text-align: center; min-width: 0; cursor: pointer; border-radius: 8px; padding: 4px 2px 2px; }
+.income-col:hover { background: var(--bg-soft); }
+.income-col.active { background: rgba(0, 102, 204, 0.08); }
+.income-col.active .income-bar { background: var(--primary); }
 .income-bar-zone {
   height: 90px;
   display: flex;

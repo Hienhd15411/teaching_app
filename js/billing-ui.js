@@ -105,7 +105,9 @@
 
   // Overview cards + 6-month income chart, computed from payments and
   // roster metadata. "Đã dạy chưa thu" = overdrawn sessions × rate.
-  function renderOverview(students, billing, groups) {
+  // selMonth ('YYYY-MM') drives the per-month detail block; bars are
+  // clickable to change it.
+  function renderOverview(students, billing, groups, selMonth) {
     const now = new Date();
     const curKey = now.toISOString().slice(0, 7);
     const monthKeyOf = (y, m) => y + '-' + String(m + 1).padStart(2, '0');
@@ -151,15 +153,83 @@
     let maxV = 1;
     months.forEach((m) => { if (m.value > maxV) maxV = m.value; });
 
+    const sel = selMonth || curKey;
     const chart = `
       <div class="income-chart">
         ${months.map((m) => `
-          <div class="income-col" title="${m.label}: ${Billing.fmtVnd(m.value)}">
+          <div class="income-col ${m.key === sel ? 'active' : ''}" data-key="${m.key}" title="${m.label}: ${Billing.fmtVnd(m.value)}">
             <div class="income-val">${m.value ? shortVnd(m.value) : ''}</div>
             <div class="income-bar-zone"><div class="income-bar" style="height:${Math.max(Math.round((m.value / maxV) * 100), m.value ? 6 : 2)}%"></div></div>
             <div class="income-label">${m.label}</div>
           </div>`).join('')}
       </div>`;
+
+    // ---- per-month detail for `sel` ----
+    const byId = {};
+    students.forEach((s) => { byId[s.id] = s; });
+    let selIncome = 0;
+    let selSessions = 0;
+    const selPayments = [];
+    students.forEach((s) => {
+      const b = billing[s.id];
+      if (!b) return;
+      Object.values(b.payments || {}).forEach((p) => {
+        if ((p.date || '').slice(0, 7) === sel) {
+          selIncome += p.amount || 0;
+          selPayments.push({ name: studentName(s), date: p.date, sessions: p.sessions || 0, amount: p.amount || 0, note: p.note || '' });
+        }
+      });
+      Object.entries(b.attendance || {}).forEach(([date, a]) => {
+        if (date.slice(0, 7) === sel && a.counted) selSessions += 1;
+      });
+    });
+    selPayments.sort((a, b) => (a.date < b.date ? 1 : -1));
+    let selNew = 0;
+    students.forEach((s) => {
+      const c = s.profile && s.profile.createdAt;
+      if (c && new Date(c).toISOString().slice(0, 7) === sel) selNew += 1;
+    });
+    const selParts = sel.split('-');
+    const selLabel = 'T' + parseInt(selParts[1], 10) + '/' + selParts[0];
+
+    const monthDetail = `
+      <div class="bill-toolbar" style="margin-top:18px;">
+        <h3 style="margin:0;">📅 ${t('bill.monthDetail')} ${selLabel}</h3>
+        <input type="month" id="ovMonthInput" class="bill-select" style="width:auto;" value="${sel}" />
+      </div>
+      <div class="progress-grid" style="margin-bottom:12px;">
+        <div class="stat-card">
+          <div class="label">${t('bill.incomeIn')} ${selLabel}</div>
+          <div class="value">${shortVnd(selIncome)}</div>
+          <div class="hint">${Billing.fmtVnd(selIncome)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">${t('bill.sessionsTaught')}</div>
+          <div class="value">${selSessions}</div>
+          <div class="hint">${t('bill.sessionsCountedHint')}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">🆕 ${t('bill.newStudents')}</div>
+          <div class="value">${selNew}</div>
+          <div class="hint">${t('bill.signedUpIn')} ${selLabel}</div>
+        </div>
+      </div>
+      ${selPayments.length ? `
+        <table class="progress-table">
+          <thead><tr>
+            <th>${t('bill.payDate')}</th><th>${t('class.student')}</th>
+            <th class="num">${t('bill.sessionsCol')}</th><th class="num">${t('bill.amountCol')}</th><th>${t('bill.payNote')}</th>
+          </tr></thead>
+          <tbody>
+            ${selPayments.map((p) => `
+              <tr><td class="muted">${esc(p.date)}</td><td><strong>${esc(p.name)}</strong></td>
+              <td class="num">${p.sessions}</td><td class="num">${Billing.fmtVnd(p.amount)}</td>
+              <td class="muted">${esc(p.note)}</td></tr>`).join('')}
+            <tr><td></td><td><strong>${t('bill.totalRow')}</strong></td>
+              <td class="num"><strong>${selPayments.reduce((a, p) => a + p.sessions, 0)}</strong></td>
+              <td class="num"><strong>${Billing.fmtVnd(selIncome)}</strong></td><td></td></tr>
+          </tbody>
+        </table>` : `<div class="muted-note">${t('bill.noPaymentsInMonth')}</div>`}`;
 
     return `
       <h3 style="margin:0 0 10px;">📊 ${t('bill.overview')}</h3>
@@ -186,9 +256,11 @@
         </div>
       </div>
       <div class="stat-card" style="margin-bottom:18px;">
-        <div class="label">${t('bill.incomeChart')}</div>
+        <div class="label">${t('bill.incomeChart')} · ${t('bill.clickBarHint')}</div>
         ${chart}
-      </div>`;
+      </div>
+      ${monthDetail}
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;" />`;
   }
 
   function renderBillingTab(container, ctx) {
@@ -249,7 +321,7 @@
       : `<div class="attn-empty" style="margin-bottom:16px;">${t('bill.noneDue')}</div>`;
 
     container.innerHTML = `
-      ${renderOverview(students, billing, groups)}
+      ${renderOverview(students, billing, groups, container.__ovMonth)}
       <div class="bill-toolbar">
         <h3 style="margin:0;">${t('bill.collectSoon')}</h3>
         <button class="btn secondary" id="billSettingsBtn">⚙️ ${t('bill.rules')}</button>
@@ -287,6 +359,20 @@
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         openPaymentModal(ctx, closestUid(el));
+      });
+    });
+
+    const ovInput = container.querySelector('#ovMonthInput');
+    if (ovInput) {
+      ovInput.addEventListener('change', () => {
+        container.__ovMonth = ovInput.value || undefined;
+        renderBillingTab(container, ctx);
+      });
+    }
+    container.querySelectorAll('.income-col').forEach((col) => {
+      col.addEventListener('click', () => {
+        container.__ovMonth = col.getAttribute('data-key');
+        renderBillingTab(container, ctx);
       });
     });
 
