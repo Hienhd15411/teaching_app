@@ -216,6 +216,9 @@
           name: s.name,
           email: 'hocvien' + String(i + 1).padStart(2, '0') + '@lopdemo.vn',
           avatar: s.avatar,
+          // Staggered signup dates; the last two are fresh (<14d) so the
+          // 🆕 badge shows in the tuition "unconfigured" list.
+          createdAt: now - [90, 80, 70, 60, 50, 40, 30, 21, 6, 3][i] * day,
         },
         progress: {
           level: s.level,

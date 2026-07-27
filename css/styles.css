@@ -1272,6 +1272,16 @@ input[type="text"]:focus { border-color: var(--primary); }
 .att-btn.ok.active { background: var(--success); border-color: var(--success); color: #fff; font-weight: 700; }
 .att-btn.bad.active { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 700; }
 .att-btn.warn.active { background: var(--warning); border-color: var(--warning); color: #fff; font-weight: 700; }
+.new-badge {
+  background: rgba(26, 140, 58, 0.12);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
 
 /* Personal coaching banner on the student's Progress view */
 .coach-banner {

@@ -42,6 +42,59 @@
 
   const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
+  const DAY_MS = 86400000;
+
+  function fmtDate(ms) {
+    if (!ms) return '—';
+    const d = new Date(ms);
+    return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+  }
+
+  function agoLabel(ms) {
+    if (!ms) return t('class.neverActive');
+    const days = Math.floor((Date.now() - ms) / DAY_MS);
+    if (days <= 0) return t('class.today');
+    return days + ' ' + t('class.daysAgo');
+  }
+
+  // "Chưa cấu hình" — sorted newest signup first with a 🆕 badge so the
+  // teacher can tell fresh signups from long-time students at a glance.
+  function renderUnconfigured(unconfigured, lang) {
+    const rows = unconfigured
+      .map((s) => ({
+        s,
+        created: (s.profile && s.profile.createdAt) || 0,
+        updated: s.updatedAt || 0,
+      }))
+      .sort((a, b) => (b.created || b.updated) - (a.created || a.updated));
+
+    const body = rows.map(({ s, created, updated }) => {
+      const isNew = created && (Date.now() - created) <= 14 * DAY_MS;
+      return `
+        <tr data-uid="${esc(s.id)}" data-act="plan" class="clickable unconf-row"
+            data-search="${esc((studentName(s) + ' ' + (s.profile.email || '')).toLowerCase())}">
+          <td>${esc(s.profile.avatar || '🙂')} <strong>${esc(studentName(s))}</strong>
+            ${isNew ? `<span class="new-badge">🆕 ${t('bill.newBadge')}</span>` : ''}</td>
+          <td class="muted">${esc(s.profile.email || '')}</td>
+          <td class="num muted">${fmtDate(created)}</td>
+          <td class="num muted">${agoLabel(updated)}</td>
+          <td class="num"><button class="btn secondary" data-uid="${esc(s.id)}" data-act="plan">${t('bill.editPlan')} →</button></td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <h3 style="margin:20px 0 8px;">🔴 ${t('bill.unconfigured')} (${unconfigured.length})</h3>
+      ${unconfigured.length > 8 ? `<input type="text" id="unconfSearch" class="bill-select" style="margin-bottom:8px;max-width:320px;" placeholder="🔍 ${t('bill.searchStudent')}" />` : ''}
+      <table class="progress-table">
+        <thead><tr>
+          <th>${t('class.student')}</th><th>${t('class.email')}</th>
+          <th class="num">${t('bill.signupCol')}</th>
+          <th class="num">${t('class.lastActive')}</th><th></th>
+        </tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+  }
+
   // ================= Học phí tab =================
 
   function renderBillingTab(container, ctx) {
@@ -112,11 +165,7 @@
         <button class="btn secondary" id="newGroupBtn">+ ${t('bill.newGroup')}</button>
       </div>
       <div class="group-grid">${groupCards || `<div class="muted-note">${t('bill.noGroups')}</div>`}</div>
-      ${unconfigured.length ? `
-        <h3 style="margin:20px 0 8px;">🔴 ${t('bill.unconfigured')} (${unconfigured.length})</h3>
-        <div class="btn-row">${unconfigured.map((s) => `
-          <button class="btn secondary" data-uid="${esc(s.id)}" data-act="plan">${esc(s.profile.avatar || '🙂')} ${esc(studentName(s))} →</button>`).join('')}
-        </div>` : ''}
+      ${unconfigured.length ? renderUnconfigured(unconfigured, lang) : ''}
       <h3 style="margin:20px 0 8px;">${t('bill.roster')} (${configured.length})</h3>
       <table class="progress-table">
         <thead><tr>
@@ -145,6 +194,16 @@
         openPaymentModal(ctx, closestUid(el));
       });
     });
+
+    const unconfSearch = container.querySelector('#unconfSearch');
+    if (unconfSearch) {
+      unconfSearch.addEventListener('input', () => {
+        const q = unconfSearch.value.trim().toLowerCase();
+        container.querySelectorAll('.unconf-row').forEach((r) => {
+          r.style.display = !q || r.getAttribute('data-search').indexOf(q) >= 0 ? '' : 'none';
+        });
+      });
+    }
 
     function closestUid(el) {
       const host = el.closest('[data-uid]');
