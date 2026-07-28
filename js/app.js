@@ -971,17 +971,25 @@
         const insights = (typeof ClassInsights !== 'undefined')
           ? ClassInsights.analyze(s, lang)
           : { accuracy: null, riskLevel: 'ok', riskScore: 0, suggestions: [], weakTopics: [], stuckWords: [], inactiveDays: null };
-        return { s, p, wordsSeen, mastered, streak, xp, level, lastMs, insights };
+        const createdMs = (s.profile && s.profile.createdAt) || 0;
+        return { s, p, wordsSeen, mastered, streak, xp, level, lastMs, createdMs, insights };
       });
 
-      // Default sort: XP descending
-      rows.sort((a, b) => b.xp - a.xp);
+      // Default sort: newest first-login (account creation) first;
+      // accounts without createdAt fall back to their last-sync time.
+      rows.sort((a, b) => (b.createdMs || b.lastMs) - (a.createdMs || a.lastMs));
 
       const lastActiveLabel = (ms) => {
         if (!ms) return t('class.neverActive');
         const days = Math.floor((Date.now() - ms) / 86400000);
         if (days <= 0) return t('class.today');
         return days + ' ' + t('class.daysAgo');
+      };
+
+      const signupLabel = (ms) => {
+        if (!ms) return '—';
+        const d = new Date(ms);
+        return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
       };
 
       // "Needs attention" cards — worst risk first, top 6.
@@ -1007,11 +1015,13 @@
         return `<td class="num ${cls}">${ins.accuracy}%</td>`;
       };
 
+      const newCutoff = Date.now() - 14 * 86400000;
       const body = rows.map((r, idx) => `
         <tr class="clickable" data-student="${escapeHtml(r.s.id)}">
           <td>${idx + 1}</td>
-          <td>${escapeHtml(r.s.profile.avatar || '🙂')} <strong>${escapeHtml(r.s.profile.name || r.s.id)}</strong></td>
+          <td>${escapeHtml(r.s.profile.avatar || '🙂')} <strong>${escapeHtml(r.s.profile.name || r.s.id)}</strong>${r.createdMs > newCutoff ? ` <span class="new-badge">🆕</span>` : ''}</td>
           <td class="muted">${escapeHtml(r.s.profile.email || '')}</td>
+          <td class="num muted">${signupLabel(r.createdMs)}</td>
           <td class="num">${r.level}</td>
           <td class="num">${r.xp}</td>
           ${accCell(r.insights)}
@@ -1032,6 +1042,7 @@
               <th>#</th>
               <th>${t('class.student')}</th>
               <th>${t('class.email')}</th>
+              <th class="num">${t('bill.signupCol')}</th>
               <th class="num">${t('class.level')}</th>
               <th class="num">${t('class.xp')}</th>
               <th class="num">${t('class.accuracyCol')}</th>

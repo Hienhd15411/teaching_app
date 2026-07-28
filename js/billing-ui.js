@@ -267,8 +267,11 @@
     const { students, data, lang } = ctx;
     const { billing, groups, settings } = data;
 
+    const byNewest = (a, b) =>
+      (((b.profile && b.profile.createdAt) || b.updatedAt || 0)
+        - ((a.profile && a.profile.createdAt) || a.updatedAt || 0));
     const unconfigured = students.filter((s) => !(billing[s.id] && billing[s.id].plan));
-    const configured = students.filter((s) => billing[s.id] && billing[s.id].plan);
+    const configured = students.filter((s) => billing[s.id] && billing[s.id].plan).sort(byNewest);
 
     const groupCards = Object.entries(groups).map(([gid, g]) => `
       <div class="group-card" data-gid="${esc(gid)}">
