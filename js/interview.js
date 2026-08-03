@@ -74,7 +74,23 @@
     return ' ' + String(s || '').toLowerCase().replace(/[^a-z0-9']+/g, ' ').trim() + ' ';
   }
 
-  const STRUCTURE_MARKERS = ['first', 'then', 'because', 'so ', 'when ', 'after', 'finally', 'as a result', 'for example', 'therefore'];
+  // Connectives that signal coherent, linked speech. Includes natural
+  // spoken connectors (and/but/where/which), not just essay-style markers
+  // — a grammatical, flowing answer should score well here even without
+  // "firstly ... finally". True grammar checking isn't possible client-side
+  // on punctuation-less ASR transcripts, so this criterion measures
+  // coherence/linking and is labeled accordingly.
+  const STRUCTURE_MARKERS = [
+    'first', 'second', 'then', 'next', 'after', 'before', 'finally',
+    'because', 'so', 'and', 'but', 'also', 'where', 'which', 'when',
+    'while', 'however', 'therefore', 'for example', 'as a result',
+    'in my opinion', 'i think', 'i believe',
+  ];
+
+  function markerHit(text, marker) {
+    const rx = new RegExp('\\b' + marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+') + '\\b', 'i');
+    return rx.test(text);
+  }
 
   function scoreAnswer(question, rawText) {
     const text = normalizeText(rawText);
@@ -102,8 +118,8 @@
     const fluency = Math.max(0, Math.min(1, words / minWords) - Math.min(0.3, fillerCount * 0.05));
 
     let structHits = 0;
-    STRUCTURE_MARKERS.forEach((m) => { if (text.indexOf(m) >= 0) structHits += 1; });
-    const structure = Math.min(1, structHits / 3);
+    STRUCTURE_MARKERS.forEach((m) => { if (markerHit(text, m)) structHits += 1; });
+    const structure = Math.min(1, structHits / 4);
 
     let vocabHits = 0;
     INTERVIEW_BANK.AVIATION_VOCAB.forEach((v) => { if (text.indexOf(v) >= 0) vocabHits += 1; });
