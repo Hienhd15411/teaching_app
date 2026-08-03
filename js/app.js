@@ -45,6 +45,9 @@
       case 'game':
         renderGame(params);
         break;
+      case 'interview':
+        InterviewGame.start({ container: appEl, onExit: () => navigate('topics') });
+        break;
       default:
         renderTopics();
     }
@@ -746,6 +749,13 @@
   function resolveTopicMeta(topicId) {
     const topic = TOPICS.find((x) => x.id === topicId);
     if (topic) return { def: topic, words: VOCAB[topicId] || [], toeic: null };
+    if (topicId === 'interview_cabin_crew') {
+      return {
+        def: { id: topicId, icon: '✈️', title: { vi: 'Phỏng vấn TVHK', en: 'Cabin Crew Interview' } },
+        words: [],
+        toeic: null,
+      };
+    }
     const m = /^toeic_([^_]+)_(.+)$/.exec(topicId || '');
     if (m && typeof TOEIC !== 'undefined') {
       const ed = TOEIC.EDITIONS.find((e) => e.id === m[1]);
@@ -1199,6 +1209,10 @@
           ${chip(t('class.accuracyCol'), insights.accuracy == null ? '—' : insights.accuracy + '%')}
           ${chip(t('class.mastered'), mastered + '/' + wordsSeen)}
         </div>
+        <label class="member-row" id="ivFlagRow" hidden style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
+          <input type="checkbox" id="ivFlagCb" />
+          <span>✈️ ${t('class.interviewAccess')}</span>
+        </label>
         <h3 class="detail-h">${t('class.suggestions')}</h3>
         ${suggestionsHtml}
         <h3 class="detail-h">${t('class.weakTopics')}</h3>
@@ -1213,6 +1227,33 @@
     const close = () => backdrop.remove();
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
     backdrop.querySelector('#closeDetail').addEventListener('click', close);
+
+    // Interview feature-flag toggle — real teacher accounts only, and not
+    // for the fabricated demo roster (writes would pollute the DB).
+    (async () => {
+      const me = (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) ? FirebaseSync.getCurrentUser() : null;
+      const isRealTeacher = me && FirebaseSync.isTeacher(me)
+        && !(typeof DemoSeed !== 'undefined' && DemoSeed.isDemoUser(me));
+      if (!isRealTeacher || String(s.id).indexOf('demo-student-') === 0) return;
+      const row = backdrop.querySelector('#ivFlagRow');
+      const cb = backdrop.querySelector('#ivFlagCb');
+      if (!row || !cb) return;
+      cb.disabled = true;
+      row.hidden = false;
+      cb.checked = await InterviewAccess.getFor(s.id);
+      cb.disabled = false;
+      cb.addEventListener('change', async () => {
+        cb.disabled = true;
+        try {
+          await InterviewAccess.setFor(s.id, cb.checked);
+          toast((cb.checked ? '✅ ' : '🚫 ') + t('class.interviewAccess') + ': ' + (s.profile.name || s.id));
+        } catch (e) {
+          cb.checked = !cb.checked;
+          toast('❌ ' + (e && e.message || 'error'));
+        }
+        cb.disabled = false;
+      });
+    })();
   }
 
   function exportClassCsv(students) {
@@ -1260,7 +1301,7 @@
     document.querySelectorAll('[data-view-link]').forEach((el) => {
       el.addEventListener('click', () => {
         const v = el.getAttribute('data-view-link');
-        if (v === 'topics' || v === 'progress' || v === 'toeic' || v === 'class') {
+        if (v === 'topics' || v === 'progress' || v === 'toeic' || v === 'class' || v === 'interview') {
           if (!Storage.getActiveProfileId()) {
             navigate('profile');
           } else {
@@ -1409,11 +1450,13 @@
           if (typeof DemoSeed !== 'undefined') DemoSeed.maybeSeed(user);
           renderHeader();
           syncClassNav();
+          syncInterviewNav();
           if (currentView === 'profile' || !currentView) navigate('topics');
           hydrateLocalFromCloud(user).catch((e) => console.warn('[app] hydrate error', e));
         } else {
           Storage.setActiveProfile(null);
           syncClassNav();
+          syncInterviewNav();
           navigate('profile');
         }
       });
@@ -1536,6 +1579,21 @@
       .slice(-300);
 
     return out;
+  }
+
+  // Show the ✈️ Phỏng vấn nav item only for accounts with the feature
+  // flag (or teacher / demo, handled inside InterviewAccess).
+  async function syncInterviewNav() {
+    const btn = document.getElementById('navInterview');
+    if (!btn) return;
+    let show = false;
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled() && typeof InterviewAccess !== 'undefined') {
+      const u = FirebaseSync.getCurrentUser();
+      if (u) {
+        try { show = await InterviewAccess.isEnabledFor(u); } catch (e) { show = false; }
+      }
+    }
+    btn.hidden = !show;
   }
 
   function syncClassNav() {

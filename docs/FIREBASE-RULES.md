@@ -10,6 +10,8 @@ Access summary:
 - `/billing/{uid}` — student **reads own** (fee-reminder banner + attendance
   history); only teachers write. Students can never edit sessions or money.
 - `/groups`, `/billing_settings` — teachers only.
+- `/feature_flags/{uid}` — student reads own (gates the ✈️ Interview nav);
+  only teachers write (toggle in the student detail modal).
 
 ```json
 {
@@ -35,6 +37,13 @@ Access summary:
     "billing_settings": {
       ".read": "auth != null && root.child('teachers').child(auth.uid).val() == true",
       ".write": "auth != null && root.child('teachers').child(auth.uid).val() == true"
+    },
+    "feature_flags": {
+      ".read": "auth != null && root.child('teachers').child(auth.uid).val() == true",
+      ".write": "auth != null && root.child('teachers').child(auth.uid).val() == true",
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('teachers').child(auth.uid).val() == true)"
+      }
     },
     "teachers": {
       ".read": "auth != null",

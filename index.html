@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vocab Quest — Học từ vựng tiếng Anh giao tiếp</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260613f" />
+  <link rel="stylesheet" href="css/styles.css?v=20260613g" />
 </head>
 <body>
   <header class="app-header">
@@ -16,6 +16,7 @@
       <button class="nav-btn" data-view-link="topics" data-i18n="nav.topics">Chủ đề</button>
       <button class="nav-btn" data-view-link="progress" data-i18n="nav.progress">Tiến độ</button>
       <button class="nav-btn" data-view-link="toeic" data-i18n="nav.toeic">TOEIC</button>
+      <button class="nav-btn" data-view-link="interview" data-i18n="nav.interview" id="navInterview" hidden>✈️ Phỏng vấn</button>
       <button class="nav-btn" data-view-link="class" data-i18n="nav.class">Lớp học</button>
     </nav>
     <div class="header-right">
@@ -46,6 +47,7 @@
   <script src="js/data/toeic-part5.js"></script>
   <script src="js/data/toeic-part6.js"></script>
   <script src="js/data/toeic-part7.js"></script>
+  <script src="js/data/interview-bank.js"></script>
 
   <!-- Firebase (loaded from CDN; no-ops if config is placeholder) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
@@ -72,6 +74,7 @@
   <script src="js/games/typing.js"></script>
   <script src="js/games/matching.js"></script>
   <script src="js/games/speaking.js"></script>
+  <script src="js/interview.js"></script>
 
   <!-- App -->
   <script src="js/app.js"></script>
