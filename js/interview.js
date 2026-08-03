@@ -196,6 +196,7 @@
                 </button>
               </div>` : `<div class="muted-note" style="text-align:center;">${t('iv.noAsr')}</div>`}
             <textarea id="ivText" class="iv-textarea" rows="5" placeholder="${t('iv.typeHere')}"></textarea>
+            <div class="muted-note" style="text-align:center;">${t('iv.editHint')}</div>
             <div class="btn-row" style="justify-content:center;margin-top:10px;">
               <button class="btn" type="button" id="ivSubmit">${t('iv.submit')}</button>
             </div>
