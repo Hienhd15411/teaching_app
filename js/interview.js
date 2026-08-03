@@ -80,10 +80,15 @@
     const text = normalizeText(rawText);
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
 
+    // Each keyword is a synonym group 'label|alt1|alt2...' — the idea is
+    // covered if ANY variant appears. Candidates say "friendly and
+    // hard-working", not the meta-word "personality".
     const matched = [];
     const missed = [];
     (question.keywords || []).forEach((k) => {
-      if (text.indexOf(k.toLowerCase()) >= 0) matched.push(k); else missed.push(k);
+      const alts = String(k).split('|');
+      const hit = alts.some((a) => text.indexOf(a.trim().toLowerCase()) >= 0);
+      if (hit) matched.push(alts[0]); else missed.push(alts[0]);
     });
     const content = question.keywords && question.keywords.length
       ? matched.length / question.keywords.length : 0.5;
