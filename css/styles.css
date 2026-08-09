@@ -1298,6 +1298,27 @@ input[type="text"]:focus { border-color: var(--primary); }
 .income-val { font-size: 11px; font-weight: 700; color: var(--ink-muted-80); min-height: 15px; }
 
 /* ===== Cabin-crew interview ===== */
+.iv-airline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+.iv-airline-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--airline-accent, var(--primary));
+  border-radius: var(--radius);
+  padding: 22px 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.iv-airline-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.iv-airline-icon { font-size: 44px; margin-bottom: 8px; }
+.iv-airline-name { font-weight: 700; font-size: 18px; margin-bottom: 6px; }
+.iv-airline-tag { color: var(--text-muted); font-size: 13px; line-height: 1.4; }
+.iv-airline-chip { background: var(--bg-soft); font-weight: 600; }
 .iv-question-card {
   background: var(--bg-soft);
   border-radius: var(--radius);

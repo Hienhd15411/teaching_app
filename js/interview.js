@@ -53,18 +53,30 @@
     return a;
   }
 
-  function buildSession() {
+  // Build a section-by-section interview for a given airline. Each section
+  // draws from questions scoped to that airline ('all' or containing the
+  // airline id), following INTERVIEW_BANK.SECTION_PLAN. Airline-knowledge
+  // questions are airline-specific; the rest are shared.
+  function buildSession(airlineId) {
     const bank = INTERVIEW_BANK.questions;
-    const byCat = { self: [], life: [], situation: [], star: [] };
-    bank.forEach((q) => { if (byCat[q.cat]) byCat[q.cat].push(q); });
+    const forAirline = (q) => q.airlines === 'all' || (Array.isArray(q.airlines) && q.airlines.indexOf(airlineId) >= 0);
+    const plan = INTERVIEW_BANK.SECTION_PLAN;
 
-    const intro = byCat.self.find((q) => q.id === 'self_intro');
-    const selfRest = shuffle(byCat.self.filter((q) => q.id !== 'self_intro'));
-    const picks = [intro]
-      .concat(selfRest.slice(0, 1))
-      .concat(shuffle(byCat.life).slice(0, 2))
-      .concat(shuffle(byCat.situation).slice(0, 2))
-      .concat(shuffle(byCat.star).slice(0, 1));
+    const picks = [];
+    plan.forEach(({ section, n }) => {
+      let pool = bank.filter((q) => q.section === section && forAirline(q));
+      // Warm-up always opens with the classic self-intro if present.
+      if (section === 'warmup') {
+        const intro = pool.find((q) => q.id === 'self_intro');
+        if (intro) {
+          picks.push(intro);
+          pool = pool.filter((q) => q.id !== 'self_intro');
+          if (n - 1 > 0) picks.push(...shuffle(pool).slice(0, n - 1));
+          return;
+        }
+      }
+      picks.push(...shuffle(pool).slice(0, n));
+    });
     return picks.filter(Boolean);
   }
 
@@ -139,11 +151,44 @@
 
   // ---------- engine ----------
 
+  // Airline picker — the entry screen. Choosing an airline starts a
+  // section-based session tuned to that airline's signature.
   function start(opts) {
     const { container, onExit } = opts;
     const t = I18N.t;
     const lang = I18N.getLang();
-    const session = buildSession();
+
+    if (opts.airlineId) return runSession(opts, opts.airlineId);
+
+    const airlines = INTERVIEW_BANK.AIRLINES;
+    container.innerHTML = `
+      <section class="view iv-view">
+        <h1>✈️ ${t('iv.pickAirlineTitle')}</h1>
+        <p style="color:var(--text-muted);margin-top:4px;">${t('iv.pickAirlineSub')}</p>
+        <div class="iv-airline-grid">
+          ${Object.values(airlines).map((a) => `
+            <button class="iv-airline-card" type="button" data-airline="${a.id}" style="--airline-accent:${a.accent};">
+              <div class="iv-airline-icon">${a.icon}</div>
+              <div class="iv-airline-name">${escapeHtml(a.name)}</div>
+              <div class="iv-airline-tag">${escapeHtml(a.tagline[lang] || a.tagline.vi)}</div>
+            </button>`).join('')}
+        </div>
+        <p class="muted-note" style="margin-top:16px;">${t('iv.pickAirlineNote')}</p>
+      </section>
+    `;
+    container.querySelectorAll('.iv-airline-card').forEach((btn) => {
+      btn.addEventListener('click', () => runSession(opts, btn.getAttribute('data-airline')));
+    });
+  }
+
+  function runSession(opts, airlineId) {
+    const { container, onExit } = opts;
+    const t = I18N.t;
+    const lang = I18N.getLang();
+    const airline = (INTERVIEW_BANK.AIRLINES || {})[airlineId] || null;
+    const sectionOf = {};
+    (INTERVIEW_BANK.SECTIONS || []).forEach((s) => { sectionOf[s.id] = s; });
+    const session = buildSession(airlineId);
     const results = []; // {question, text, score}
     let queue = session.slice();
     let followUpsUsed = 0;
@@ -176,8 +221,9 @@
       if (typeof Pronunciation !== 'undefined') Pronunciation.cancel();
     }
 
-    function catBadge(cat) {
-      const c = INTERVIEW_BANK.CATEGORIES[cat] || { icon: '❓', label: { vi: cat, en: cat } };
+    function catBadge(q) {
+      const sec = sectionOf[q.section];
+      const c = sec || (INTERVIEW_BANK.CATEGORIES[q.cat]) || { icon: '❓', label: { vi: q.cat, en: q.cat } };
       return `<span class="iv-cat">${c.icon} ${escapeHtml(c.label[lang] || c.label.vi)}</span>`;
     }
 
@@ -191,12 +237,13 @@
         <section class="view game-view iv-view">
           <div class="game-hud">
             <button class="btn secondary" type="button" id="ivExit">← ${t('game.back')}</button>
+            ${airline ? `<span class="chip iv-airline-chip">${airline.icon} ${escapeHtml(airline.name)}</span>` : ''}
             <span class="chip">${answered + 1}/${totalPlanned}</span>
             <button class="icon-btn" type="button" id="ivTimerToggle" title="${t('iv.timerToggle')}">⏱ ${timerOn ? 'ON' : 'OFF'}</button>
             <span class="chip iv-timer" id="ivTimer" ${timerOn ? '' : 'hidden'}></span>
           </div>
           <div class="iv-question-card">
-            ${catBadge(current.cat)}
+            ${catBadge(current)}
             ${current.isFollowUp ? `<span class="iv-followup-tag">↳ ${t('iv.followUp')}</span>` : ''}
             <div class="iv-question">${escapeHtml(current.q)}
               <button class="speak-btn big" type="button" data-speak="${escapeHtml(current.q)}">🔊</button>
@@ -221,7 +268,7 @@
         </section>
       `;
 
-      container.querySelector('#ivExit').addEventListener('click', () => { cleanup(); onExit(); });
+      container.querySelector('#ivExit').addEventListener('click', () => { cleanup(); start(Object.assign({}, opts, { airlineId: null })); });
       container.querySelector('#ivTimerToggle').addEventListener('click', () => {
         timerOn = !timerOn;
         localStorage.setItem(TIMER_KEY, timerOn ? '1' : '0');
@@ -409,13 +456,15 @@
             </table>
             <div class="btn-row" style="justify-content:center;">
               <button class="btn" type="button" id="ivAgain">🔁 ${t('iv.again')}</button>
+              <button class="btn secondary" type="button" id="ivChangeAirline">✈️ ${t('iv.changeAirline')}</button>
               <button class="btn secondary" type="button" id="ivExitEnd">${t('game.back')}</button>
             </div>
             <p class="muted-note" style="max-width:560px;margin:14px auto 0;">${t('iv.disclaimer')}</p>
           </div>
         </section>
       `;
-      container.querySelector('#ivAgain').addEventListener('click', () => start(opts));
+      container.querySelector('#ivAgain').addEventListener('click', () => runSession(opts, airlineId));
+      container.querySelector('#ivChangeAirline').addEventListener('click', () => start(Object.assign({}, opts, { airlineId: null })));
       container.querySelector('#ivExitEnd').addEventListener('click', onExit);
     }
 
