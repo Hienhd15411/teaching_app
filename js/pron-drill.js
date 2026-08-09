@@ -32,7 +32,9 @@
     return dp[n];
   }
 
-  // Per-word grade: for each target word, find the closest spoken word.
+  // Per-word grade: for each target word, find the closest spoken word —
+  // also trying adjacent said words JOINED, because ASR often splits
+  // ("seatbelt" → "seat belt") or merges words even on a perfect read.
   // ratio = distance / word length → 0 good, higher worse.
   function scorePhrase(target, transcript) {
     const tgt = words(target);
@@ -40,15 +42,29 @@
     const perWord = tgt.map((w) => {
       let best = Infinity;
       said.forEach((s) => { const d = levenshtein(w, s); if (d < best) best = d; });
+      for (let j = 0; j < said.length - 1; j++) {
+        const d = levenshtein(w, said[j] + said[j + 1]);
+        if (d < best) best = d;
+      }
       if (best === Infinity) best = w.length;
       const ratio = best / Math.max(1, w.length);
-      const state = ratio <= 0.2 ? 'good' : ratio <= 0.5 ? 'ok' : 'bad';
+      const state = ratio <= 0.25 ? 'good' : ratio <= 0.5 ? 'ok' : 'bad';
       return { word: w, ratio, state };
     });
     const goodCount = perWord.filter((p) => p.state === 'good').length;
     const okCount = perWord.filter((p) => p.state === 'ok').length;
-    const score = tgt.length ? (goodCount + okCount * 0.5) / tgt.length : 0;
-    return { perWord, score: Math.round(score * 100) / 10, said: normalize(transcript) };
+    const perWordScore = tgt.length ? (goodCount + okCount * 0.5) / tgt.length : 0;
+
+    // Whole-utterance match ignoring word boundaries: strip spaces and
+    // compare character sequences. A correct read whose only "error" is
+    // where ASR put the spaces (seat belt / a board / take off) matches
+    // here and earns full marks.
+    const tj = normalize(target).replace(/\s+/g, '');
+    const sj = normalize(transcript).replace(/\s+/g, '');
+    const overall = tj.length ? 1 - Math.min(1, levenshtein(tj, sj) / tj.length) : 0;
+
+    const score01 = Math.max(perWordScore, overall);
+    return { perWord, score: Math.round(score01 * 100) / 10, said: normalize(transcript) };
   }
 
   function esc(s) {
