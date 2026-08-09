@@ -16,8 +16,14 @@
     ));
   }
 
-  function navigate(view, params) {
+  function navigate(view, params, opts) {
     currentView = view;
+    // Push a browser-history entry so the device/browser Back button walks
+    // back through in-app views instead of leaving the app. When the call
+    // itself came from a popstate (Back), don't push again.
+    if (!(opts && opts.fromPop) && typeof history !== 'undefined') {
+      try { history.pushState({ view: view, params: params || null }, ''); } catch (e) {}
+    }
     renderHeader();
     highlightNav(view);
     switch (view) {
@@ -1462,6 +1468,21 @@
       });
     }
     syncClassNav();
+
+    // Browser/device Back button: walk back through in-app views instead
+    // of leaving the app. popstate gives us the previous view's state; if
+    // there's none left, stay on a safe in-app view rather than bouncing
+    // out to a blank page.
+    window.addEventListener('popstate', (e) => {
+      const st = e.state;
+      if (st && st.view) {
+        navigate(st.view, st.params, { fromPop: true });
+      } else {
+        const home = (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()
+          && !FirebaseSync.getCurrentUser()) ? 'profile' : 'topics';
+        navigate(home, null, { fromPop: true });
+      }
+    });
 
     // Initial route
     const hasActive = Storage.getActiveProfileId() && Storage.getActiveProfile();

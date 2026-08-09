@@ -259,7 +259,7 @@
                   ${airlineTag ? `<span class="iv-bank-airline">${escapeHtml(airlineTag)}</span>` : ''}
                 </div>
                 <div class="iv-bank-vi">${escapeHtml(q.qVi || '')}</div>
-                ${kws ? `<div class="fb-row"><span class="fb-label">${t('iv.hitKeywords')}</span><span class="syn-list">${kws}</span></div>` : ''}
+                ${kws ? `<div class="fb-row"><span class="fb-label">${t('iv.bankKeywords')}</span><span class="syn-list">${kws}</span></div>` : ''}
                 ${q.model ? `<details class="iv-details"><summary>💡 ${t('iv.modelAnswer')}</summary><p>${escapeHtml(q.model)}</p></details>` : ''}
               </div>`;
           }).join('')}`;
