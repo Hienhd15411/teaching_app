@@ -66,6 +66,9 @@
     if (ipaMap) return ipaMap;
     ipaMap = {};
     try {
+      // Base dictionary of common/function words first, then topical vocab.
+      const base = global.IPA_DICT || {};
+      Object.keys(base).forEach((k) => { ipaMap[normalize(k)] = base[k]; });
       const V = global.VOCAB || {};
       Object.keys(V).forEach((topic) => {
         (V[topic] || []).forEach((w) => {
