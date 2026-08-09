@@ -57,10 +57,19 @@
   // draws from questions scoped to that airline ('all' or containing the
   // airline id), following INTERVIEW_BANK.SECTION_PLAN. Airline-knowledge
   // questions are airline-specific; the rest are shared.
-  function buildSession(airlineId) {
+  // sections: optional array of section ids to focus on. When given, only
+  // those sections are drawn; a single focused section yields more
+  // questions so the drill is worthwhile.
+  function buildSession(airlineId, sections) {
     const bank = INTERVIEW_BANK.questions;
     const forAirline = (q) => q.airlines === 'all' || (Array.isArray(q.airlines) && q.airlines.indexOf(airlineId) >= 0);
-    const plan = INTERVIEW_BANK.SECTION_PLAN;
+    let plan = INTERVIEW_BANK.SECTION_PLAN;
+    if (sections && sections.length) {
+      const focus = sections.length === 1 ? 5 : sections.length <= 2 ? 3 : 2;
+      plan = INTERVIEW_BANK.SECTION_PLAN
+        .filter((p) => sections.indexOf(p.section) >= 0)
+        .map((p) => ({ section: p.section, n: focus }));
+    }
 
     const picks = [];
     plan.forEach(({ section, n }) => {
@@ -105,7 +114,12 @@
     return rx.test(text);
   }
 
-  function scoreAnswer(question, rawText) {
+  // pronConfidence: average SpeechRecognition confidence (0-1) for the
+  // spoken answer, or null when the student typed. Browsers can't compare
+  // free-form speech to a target IPA phoneme-by-phoneme, so we use ASR
+  // confidence as an honest pronunciation-clarity proxy: the clearer the
+  // pronunciation, the more reliably the engine recognizes the words.
+  function scoreAnswer(question, rawText, pronConfidence) {
     const text = normalizeText(rawText);
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
 
@@ -135,19 +149,26 @@
     });
     const fluency = Math.max(0, Math.min(1, words / minWords) - Math.min(0.3, fillerCount * 0.05));
 
-    // Coherence: two distinct connectives already reads as linked, natural
-    // speech. Bar kept low so a fluent answer (like the model answers) is
-    // not punished for lacking essay-style "firstly ... finally".
-    let structHits = 0;
-    STRUCTURE_MARKERS.forEach((m) => { if (markerHit(text, m)) structHits += 1; });
-    const structure = Math.min(1, structHits / 2);
-
     let vocabHits = 0;
     INTERVIEW_BANK.AVIATION_VOCAB.forEach((v) => { if (text.indexOf(v) >= 0) vocabHits += 1; });
     const vocab = Math.min(1, vocabHits / 2);
 
-    const total = Math.round((content * 0.4 + fluency * 0.25 + structure * 0.2 + vocab * 0.15) * 100) / 10;
-    return { total, content, fluency, structure, vocab, matched, missed, words, fillerCount };
+    // Pronunciation from ASR confidence. Chrome tends to report 0.7-0.95
+    // for clear speech; map that band to 0-1 so the score is discriminating.
+    const hasPron = typeof pronConfidence === 'number' && pronConfidence > 0;
+    const pron = hasPron ? Math.max(0, Math.min(1, (pronConfidence - 0.5) / 0.4)) : null;
+
+    // Weights: content 40, fluency 30, pronunciation 15, vocab 15. When the
+    // answer was typed (no pronunciation), its 15% is redistributed to the
+    // other three so typing is never unfairly capped.
+    let total;
+    if (pron == null) {
+      total = (content * 0.40 + fluency * 0.30 + vocab * 0.15) / 0.85;
+    } else {
+      total = content * 0.40 + fluency * 0.30 + pron * 0.15 + vocab * 0.15;
+    }
+    total = Math.round(total * 100) / 10;
+    return { total, content, fluency, pron, vocab, matched, missed, words, fillerCount };
   }
 
   function gradeMeta(score10) {
@@ -177,16 +198,138 @@
         <div class="iv-airline-grid">
           ${Object.values(airlines).map((a) => `
             <button class="iv-airline-card" type="button" data-airline="${a.id}" style="--airline-accent:${a.accent};">
-              <div class="iv-airline-icon">${a.icon}</div>
+              <div class="iv-airline-logo">${airlineLogo(a)}</div>
               <div class="iv-airline-name">${escapeHtml(a.name)}</div>
               <div class="iv-airline-tag">${escapeHtml(a.tagline[lang] || a.tagline.vi)}</div>
             </button>`).join('')}
         </div>
         <p class="muted-note" style="margin-top:16px;">${t('iv.pickAirlineNote')}</p>
+        ${isTeacher() ? `<div style="margin-top:16px;"><button class="btn secondary" type="button" id="ivReviewBank">📋 ${t('iv.reviewBank')}</button></div>` : ''}
       </section>
     `;
     container.querySelectorAll('.iv-airline-card').forEach((btn) => {
-      btn.addEventListener('click', () => runSession(opts, btn.getAttribute('data-airline')));
+      btn.addEventListener('click', () => pickSections(opts, btn.getAttribute('data-airline')));
+    });
+    const rb = container.querySelector('#ivReviewBank');
+    if (rb) rb.addEventListener('click', () => renderBank(opts));
+  }
+
+  function isTeacher() {
+    return typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()
+      && FirebaseSync.isTeacher(FirebaseSync.getCurrentUser());
+  }
+
+  // Teacher-only: browse the whole question bank to cross-check content —
+  // grouped by section, filterable by airline, showing each question's
+  // Vietnamese gloss, scoring keywords, and model answer.
+  function renderBank(opts) {
+    const { container } = opts;
+    const t = I18N.t;
+    const lang = I18N.getLang();
+    const airlines = INTERVIEW_BANK.AIRLINES;
+    const sections = INTERVIEW_BANK.SECTIONS;
+    let airlineFilter = 'all';
+
+    const paint = () => {
+      const forA = (q) => airlineFilter === 'all' || q.airlines === 'all'
+        || (Array.isArray(q.airlines) && q.airlines.indexOf(airlineFilter) >= 0);
+      const total = INTERVIEW_BANK.questions.filter(forA).length;
+
+      const blocks = sections.map((sec) => {
+        const qs = INTERVIEW_BANK.questions.filter((q) => q.section === sec.id && forA(q));
+        if (!qs.length) return '';
+        return `
+          <h3 class="detail-h">${sec.icon} ${escapeHtml(sec.label[lang] || sec.label.vi)} <span class="muted-note" style="display:inline;">(${qs.length})</span></h3>
+          ${qs.map((q) => {
+            const airlineTag = Array.isArray(q.airlines)
+              ? q.airlines.map((id) => (airlines[id] ? airlines[id].icon + ' ' + airlines[id].name : id)).join(', ')
+              : '';
+            const kws = (q.keywords || []).map((k) => `<span>${escapeHtml(String(k).split('|')[0])}</span>`).join('');
+            return `
+              <div class="iv-bank-item">
+                <div class="iv-bank-q">${escapeHtml(q.q)}
+                  <button class="speak-btn" type="button" data-speak="${escapeHtml(q.q)}">🔊</button>
+                  ${airlineTag ? `<span class="iv-bank-airline">${escapeHtml(airlineTag)}</span>` : ''}
+                </div>
+                <div class="iv-bank-vi">${escapeHtml(q.qVi || '')}</div>
+                ${kws ? `<div class="fb-row"><span class="fb-label">${t('iv.hitKeywords')}</span><span class="syn-list">${kws}</span></div>` : ''}
+                ${q.model ? `<details class="iv-details"><summary>💡 ${t('iv.modelAnswer')}</summary><p>${escapeHtml(q.model)}</p></details>` : ''}
+              </div>`;
+          }).join('')}`;
+      }).join('');
+
+      container.innerHTML = `
+        <section class="view iv-view">
+          <button class="btn secondary" type="button" id="bankBack" style="margin-bottom:12px;">← ${t('game.back')}</button>
+          <h1>📋 ${t('iv.bankTitle')}</h1>
+          <p style="color:var(--text-muted);margin-top:4px;">${total} ${t('iv.bankCount')}</p>
+          <div class="voice-pills" style="margin:12px 0;">
+            <button class="voice-pill iv-af ${airlineFilter === 'all' ? 'active' : ''}" data-af="all">${t('bill.filterAll')}</button>
+            ${Object.values(airlines).map((a) => `<button class="voice-pill iv-af ${airlineFilter === a.id ? 'active' : ''}" data-af="${a.id}">${a.icon} ${escapeHtml(a.name)}</button>`).join('')}
+          </div>
+          ${blocks}
+        </section>
+      `;
+      container.querySelector('#bankBack').addEventListener('click', () => start(opts));
+      container.querySelectorAll('.iv-af').forEach((b) => {
+        b.addEventListener('click', () => { airlineFilter = b.getAttribute('data-af'); paint(); });
+      });
+      if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(container);
+    };
+    paint();
+  }
+
+  // Optional airline logo: if the teacher has dropped a licensed logo file
+  // at assets/airline-logos/<id>.png it is used; otherwise a branded
+  // colored monogram card is shown (real trademarked logos are not bundled).
+  function airlineLogo(a) {
+    const src = 'assets/airline-logos/' + a.id + '.png';
+    return `<img src="${src}" alt="${escapeHtml(a.name)}" class="iv-logo-img"
+      onerror="this.remove();" />
+      <span class="iv-logo-fallback" style="background:${a.accent};">${a.icon}</span>`;
+  }
+
+  // Section picker — choose the whole interview or drill specific sections.
+  function pickSections(opts, airlineId) {
+    const { container } = opts;
+    const t = I18N.t;
+    const lang = I18N.getLang();
+    const airline = (INTERVIEW_BANK.AIRLINES || {})[airlineId];
+    const sections = INTERVIEW_BANK.SECTIONS;
+    const selected = new Set();
+
+    container.innerHTML = `
+      <section class="view iv-view">
+        <button class="btn secondary" type="button" id="secBack" style="margin-bottom:12px;">← ${t('iv.changeAirline')}</button>
+        <h1>${airline ? airline.icon + ' ' + escapeHtml(airline.name) : ''}</h1>
+        <p style="color:var(--text-muted);margin-top:4px;">${t('iv.pickSectionSub')}</p>
+        <div class="iv-section-grid">
+          ${sections.map((s) => `
+            <button class="iv-section-chip" type="button" data-sec="${s.id}">
+              <span class="iv-section-ic">${s.icon}</span>
+              <span>${escapeHtml(s.label[lang] || s.label.vi)}</span>
+            </button>`).join('')}
+        </div>
+        <div class="btn-row" style="margin-top:20px;">
+          <button class="btn" type="button" id="secFull">🎬 ${t('iv.fullInterview')}</button>
+          <button class="btn secondary" type="button" id="secStart" disabled>${t('iv.startSelected')} (<span id="secCount">0</span>)</button>
+        </div>
+      </section>
+    `;
+    container.querySelector('#secBack').addEventListener('click', () => start(Object.assign({}, opts, { airlineId: null, sections: null })));
+    container.querySelectorAll('.iv-section-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const id = chip.getAttribute('data-sec');
+        if (selected.has(id)) { selected.delete(id); chip.classList.remove('active'); }
+        else { selected.add(id); chip.classList.add('active'); }
+        container.querySelector('#secCount').textContent = selected.size;
+        container.querySelector('#secStart').disabled = selected.size === 0;
+      });
+    });
+    container.querySelector('#secFull').addEventListener('click', () => runSession(opts, airlineId));
+    container.querySelector('#secStart').addEventListener('click', () => {
+      if (!selected.size) return;
+      runSession(Object.assign({}, opts, { sections: Array.from(selected) }), airlineId);
     });
   }
 
@@ -197,11 +340,12 @@
     const airline = (INTERVIEW_BANK.AIRLINES || {})[airlineId] || null;
     const sectionOf = {};
     (INTERVIEW_BANK.SECTIONS || []).forEach((s) => { sectionOf[s.id] = s; });
-    const session = buildSession(airlineId);
+    const session = buildSession(airlineId, opts.sections);
     const results = []; // {question, text, score}
     let queue = session.slice();
     let followUpsUsed = 0;
     let current = null;
+    let answerConfidences = []; // ASR confidence samples for the current answer
     let recognition = null;
     let listening = false;
     let timerId = null;
@@ -239,6 +383,7 @@
     function renderQuestion() {
       if (!queue.length) return renderResult();
       current = queue.shift();
+      answerConfidences = [];
       const answered = results.length;
       const totalPlanned = answered + 1 + queue.length;
 
@@ -329,9 +474,14 @@
       recognition.onresult = (e) => {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          const tr = e.results[i][0].transcript;
-          if (e.results[i].isFinal) committed += tr + ' ';
-          else interim += tr;
+          const res = e.results[i];
+          const tr = res[0].transcript;
+          if (res.isFinal) {
+            committed += tr + ' ';
+            if (typeof res[0].confidence === 'number' && res[0].confidence > 0) {
+              answerConfidences.push(res[0].confidence);
+            }
+          } else interim += tr;
         }
         textarea.value = (committed + interim).trim();
       };
@@ -355,7 +505,9 @@
       const textarea = container.querySelector('#ivText');
       if (!textarea) return;
       const text = textarea.value.trim();
-      const score = scoreAnswer(current, text);
+      const avgConf = answerConfidences.length
+        ? answerConfidences.reduce((a, b) => a + b, 0) / answerConfidences.length : null;
+      const score = scoreAnswer(current, text, avgConf);
       results.push({ question: current, text, score });
 
       // Keyword-triggered follow-up (only from main questions).
@@ -409,7 +561,9 @@
         <div class="iv-crits">
           ${bar(t('iv.critContent'), score.content)}
           ${bar(t('iv.critFluency'), score.fluency)}
-          ${bar(t('iv.critStructure'), score.structure)}
+          ${score.pron == null
+            ? `<div class="iv-crit"><span class="iv-crit-label">${t('iv.critPron')}</span><span class="iv-crit-pct" style="width:auto;color:var(--text-muted);">${t('iv.pronTyped')}</span></div>`
+            : bar(t('iv.critPron'), score.pron)}
           ${bar(t('iv.critVocab'), score.vocab)}
         </div>
         ${score.matched.length ? `<div class="fb-row"><span class="fb-label">${t('iv.hitKeywords')}</span><span class="syn-list">${score.matched.map((k) => `<span>${escapeHtml(k)}</span>`).join('')}</span></div>` : ''}

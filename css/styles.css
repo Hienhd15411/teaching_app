@@ -1315,10 +1315,42 @@ input[type="text"]:focus { border-color: var(--primary); }
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .iv-airline-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-.iv-airline-icon { font-size: 44px; margin-bottom: 8px; }
 .iv-airline-name { font-weight: 700; font-size: 18px; margin-bottom: 6px; }
 .iv-airline-tag { color: var(--text-muted); font-size: 13px; line-height: 1.4; }
 .iv-airline-chip { background: var(--bg-soft); font-weight: 600; }
+.iv-airline-logo { height: 56px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; }
+.iv-logo-img { max-height: 56px; max-width: 160px; object-fit: contain; }
+.iv-logo-fallback {
+  width: 56px; height: 56px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; font-size: 30px;
+  color: #fff;
+}
+/* When a licensed logo image loaded, hide the monogram fallback next to it. */
+.iv-logo-img + .iv-logo-fallback { display: none; }
+.iv-section-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px; margin-top: 18px;
+}
+.iv-section-chip {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; cursor: pointer;
+  font-size: 15px; font-weight: 600; text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.iv-section-chip:hover { border-color: var(--primary); }
+.iv-section-chip.active { border-color: var(--primary); background: rgba(0,102,204,0.08); }
+.iv-section-ic { font-size: 24px; }
+.iv-bank-item {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 10px; background: var(--bg-card);
+}
+.iv-bank-q { font-weight: 600; font-size: 15px; }
+.iv-bank-vi { color: var(--text-muted); font-size: 13px; margin: 4px 0 8px; }
+.iv-bank-airline {
+  display: inline-block; background: var(--bg-soft); color: var(--text-muted);
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 6px;
+}
 .iv-question-card {
   background: var(--bg-soft);
   border-radius: var(--radius);
