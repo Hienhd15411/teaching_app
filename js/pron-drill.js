@@ -56,6 +56,38 @@
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  // Word→IPA lookup built once from the app's vocabulary (each VOCAB entry
+  // carries an `ipa`). Used to auto-annotate a custom sentence the learner
+  // types — known words get IPA, unknown words are shown as-is. Browsers
+  // can't phonemize arbitrary text, so this partial guide plus the TTS
+  // model pronunciation is the honest best we can do client-side.
+  let ipaMap = null;
+  function buildIpaMap() {
+    if (ipaMap) return ipaMap;
+    ipaMap = {};
+    try {
+      const V = global.VOCAB || {};
+      Object.keys(V).forEach((topic) => {
+        (V[topic] || []).forEach((w) => {
+          if (w && w.en && w.ipa) {
+            const key = normalize(w.en);
+            if (key && !ipaMap[key]) ipaMap[key] = w.ipa;
+          }
+        });
+      });
+    } catch (e) {}
+    return ipaMap;
+  }
+
+  function ipaForSentence(text) {
+    const map = buildIpaMap();
+    const toks = normalize(text).split(' ').filter(Boolean);
+    if (!toks.length) return '';
+    let known = 0;
+    const parts = toks.map((w) => { if (map[w]) { known += 1; return map[w]; } return w; });
+    return known ? parts.join(' ') : '';
+  }
+
   function start(opts) {
     const { container, onExit } = opts;
     const t = I18N.t;
@@ -81,6 +113,10 @@
           <h1>🗣️ ${t('pd.title')}</h1>
           <p style="color:var(--text-muted);margin-top:4px;">${t('pd.sub')}</p>
           <div class="iv-section-grid">
+            <button class="iv-section-chip" type="button" id="pdCustom" style="border-color:var(--primary);">
+              <span class="iv-section-ic">✍️</span>
+              <span>${esc(t('pd.customEntry'))}</span>
+            </button>
             ${sets.map((s) => `
               <button class="iv-section-chip" type="button" data-set="${s.id}">
                 <span class="iv-section-ic">${s.icon}</span>
@@ -91,12 +127,45 @@
         </section>
       `;
       container.querySelector('#drillExit').addEventListener('click', onExit);
-      container.querySelectorAll('.iv-section-chip').forEach((btn) => {
+      container.querySelector('#pdCustom').addEventListener('click', renderCustomInput);
+      container.querySelectorAll('.iv-section-chip[data-set]').forEach((btn) => {
         btn.addEventListener('click', () => {
           set = sets.find((s) => s.id === btn.getAttribute('data-set'));
           idx = 0; scores = [];
           renderCard();
         });
+      });
+    }
+
+    // Custom-sentence mode: the learner types their own script, and we score
+    // their read-aloud against it word-by-word (with auto IPA where known).
+    function renderCustomInput() {
+      stopAsr();
+      container.innerHTML = `
+        <section class="view iv-view">
+          <button class="btn secondary" type="button" id="customBack" style="margin-bottom:12px;">← ${t('pd.sets')}</button>
+          <h1>✍️ ${t('pd.customTitle')}</h1>
+          <p style="color:var(--text-muted);margin-top:4px;">${t('pd.customSub')}</p>
+          <textarea id="pdCustomText" class="iv-textarea" rows="3" placeholder="${t('pd.customPlaceholder')}"></textarea>
+          <div class="btn-row" style="margin-top:12px;">
+            <button class="btn" type="button" id="pdCustomStart">${t('pd.customStart')} →</button>
+          </div>
+        </section>
+      `;
+      container.querySelector('#customBack').addEventListener('click', renderPicker);
+      const startBtn = container.querySelector('#pdCustomStart');
+      const ta = container.querySelector('#pdCustomText');
+      ta.focus();
+      startBtn.addEventListener('click', () => {
+        const txt = (ta.value || '').trim().replace(/\s+/g, ' ');
+        if (txt.split(' ').length < 2) { App.toast(t('pd.customTooShort')); return; }
+        set = {
+          id: 'custom', icon: '✍️',
+          label: { vi: 'Câu của bạn', en: 'Your sentence' },
+          items: [{ en: txt, ipa: ipaForSentence(txt), vi: '' }],
+        };
+        idx = 0; scores = [];
+        renderCard();
       });
     }
 
@@ -115,8 +184,8 @@
             <div class="pd-target" id="pdTarget">${item.en.split(/\s+/).map((w) => `<span class="pd-w">${esc(w)}</span>`).join(' ')}
               <button class="speak-btn big" type="button" data-speak="${esc(item.en)}">🔊</button>
             </div>
-            <div class="pd-ipa">/ ${esc(item.ipa)} /</div>
-            <div class="pd-vi">${esc(item.vi)}</div>
+            ${item.ipa ? `<div class="pd-ipa">/ ${esc(item.ipa)} /</div>` : `<div class="muted-note">${t('pd.customNoIpa')}</div>`}
+            ${item.vi ? `<div class="pd-vi">${esc(item.vi)}</div>` : ''}
           </div>
           <div class="mic-stage">
             <button class="mic-btn" type="button" id="pdMic">
