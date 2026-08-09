@@ -203,8 +203,11 @@
               <div class="iv-airline-tag">${escapeHtml(a.tagline[lang] || a.tagline.vi)}</div>
             </button>`).join('')}
         </div>
-        <p class="muted-note" style="margin-top:16px;">${t('iv.pickAirlineNote')}</p>
-        ${isTeacher() ? `<div style="margin-top:16px;"><button class="btn secondary" type="button" id="ivReviewBank">📋 ${t('iv.reviewBank')}</button></div>` : ''}
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn secondary" type="button" id="ivDrill">🗣️ ${t('pd.entry')}</button>
+          ${isTeacher() ? `<button class="btn secondary" type="button" id="ivReviewBank">📋 ${t('iv.reviewBank')}</button>` : ''}
+        </div>
+        <p class="muted-note" style="margin-top:12px;">${t('iv.pickAirlineNote')}</p>
       </section>
     `;
     container.querySelectorAll('.iv-airline-card').forEach((btn) => {
@@ -212,6 +215,10 @@
     });
     const rb = container.querySelector('#ivReviewBank');
     if (rb) rb.addEventListener('click', () => renderBank(opts));
+    const dr = container.querySelector('#ivDrill');
+    if (dr && typeof PronDrill !== 'undefined') {
+      dr.addEventListener('click', () => PronDrill.start({ container, onExit: () => start(opts) }));
+    }
   }
 
   function isTeacher() {
