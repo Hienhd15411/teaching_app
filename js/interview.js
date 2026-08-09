@@ -96,7 +96,8 @@
     'first', 'second', 'then', 'next', 'after', 'before', 'finally',
     'because', 'so', 'and', 'but', 'also', 'where', 'which', 'when',
     'while', 'however', 'therefore', 'for example', 'as a result',
-    'in my opinion', 'i think', 'i believe',
+    'in my opinion', 'i think', 'i believe', 'since', 'although',
+    'even', 'that is why', 'once', 'if', 'until', 'both', 'instead',
   ];
 
   function markerHit(text, marker) {
@@ -118,8 +119,13 @@
       const hit = alts.some((a) => text.indexOf(a.trim().toLowerCase()) >= 0);
       if (hit) matched.push(alts[0]); else missed.push(alts[0]);
     });
-    const content = question.keywords && question.keywords.length
-      ? matched.length / question.keywords.length : 0.5;
+    // Keyword lists are a SUPERSET of possible ideas — a strong answer
+    // covers the main ones, not literally all of them. Covering ~60% of
+    // the listed ideas already earns full content marks (calibrated so the
+    // model answers themselves score ~9-10).
+    const coverage = question.keywords && question.keywords.length
+      ? matched.length / question.keywords.length : 0.6;
+    const content = Math.min(1, coverage / 0.6);
 
     const minWords = question.minWords || 25;
     let fillerCount = 0;
@@ -129,13 +135,16 @@
     });
     const fluency = Math.max(0, Math.min(1, words / minWords) - Math.min(0.3, fillerCount * 0.05));
 
+    // Coherence: two distinct connectives already reads as linked, natural
+    // speech. Bar kept low so a fluent answer (like the model answers) is
+    // not punished for lacking essay-style "firstly ... finally".
     let structHits = 0;
     STRUCTURE_MARKERS.forEach((m) => { if (markerHit(text, m)) structHits += 1; });
-    const structure = Math.min(1, structHits / 4);
+    const structure = Math.min(1, structHits / 2);
 
     let vocabHits = 0;
     INTERVIEW_BANK.AVIATION_VOCAB.forEach((v) => { if (text.indexOf(v) >= 0) vocabHits += 1; });
-    const vocab = Math.min(1, vocabHits / 3);
+    const vocab = Math.min(1, vocabHits / 2);
 
     const total = Math.round((content * 0.4 + fluency * 0.25 + structure * 0.2 + vocab * 0.15) * 100) / 10;
     return { total, content, fluency, structure, vocab, matched, missed, words, fillerCount };
@@ -404,7 +413,7 @@
           ${bar(t('iv.critVocab'), score.vocab)}
         </div>
         ${score.matched.length ? `<div class="fb-row"><span class="fb-label">${t('iv.hitKeywords')}</span><span class="syn-list">${score.matched.map((k) => `<span>${escapeHtml(k)}</span>`).join('')}</span></div>` : ''}
-        ${score.missed.length ? `<div class="fb-row"><span class="fb-label">${t('iv.missKeywords')}</span><span class="ant-list">${score.missed.map((k) => `<span>${escapeHtml(k)}</span>`).join('')}</span></div>` : ''}
+        ${(score.missed.length && score.content < 1) ? `<div class="fb-row"><span class="fb-label">${t('iv.missKeywords')}</span><span class="ant-list">${score.missed.map((k) => `<span>${escapeHtml(k)}</span>`).join('')}</span></div>` : ''}
         ${text ? `<details class="iv-details"><summary>${t('iv.yourAnswer')} (${score.words} ${t('iv.words')})</summary><p>${escapeHtml(text)}</p></details>` : `<div class="muted-note">${t('iv.noAnswer')}</div>`}
         ${current.model ? `<details class="iv-details"><summary>💡 ${t('iv.modelAnswer')}</summary><p>${escapeHtml(current.model)}</p></details>` : ''}
         <div class="fb-actions"><button class="btn" type="button" id="ivNext">${t('game.next')} →</button></div>
