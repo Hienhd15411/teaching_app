@@ -76,5 +76,5 @@
   // Leave empty to hide the feature. Setup guide: docs/GOOGLE-CALENDAR.md
   // (Google Cloud Console → same project as Firebase → OAuth Client ID, Web).
   // Looks like: '1055636163241-xxxxxxxxxxxxxxxx.apps.googleusercontent.com'
-  global.GOOGLE_CALENDAR_CLIENT_ID = '';
+  global.GOOGLE_CALENDAR_CLIENT_ID = '1055636163241-j3fipndrnmitmhl0vor9ripre2832tq1.apps.googleusercontent.com';
 })(window);
