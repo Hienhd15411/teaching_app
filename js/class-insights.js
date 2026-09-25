@@ -99,10 +99,23 @@
     }
     risk += Math.min(20, stuckWords.length * 2);
     if ((p.streak || 0) === 0 && hasActivity) risk += 10;
+
+    // Missed scheduled sessions this week (student set a study schedule).
+    let missedSched = null;
+    if (p.schedule && typeof global.Placement !== 'undefined') {
+      try { missedSched = global.Placement.Schedule.missedThisWeek(p); } catch (e) { missedSched = null; }
+      if (missedSched && missedSched.missed >= 2) risk += 20;
+      else if (missedSched && missedSched.missed === 1) risk += 10;
+    }
     const riskLevel = risk >= 60 ? 'high' : risk >= 30 ? 'watch' : 'ok';
 
     // Actionable suggestions, worst problem first.
     const suggestions = [];
+    if (missedSched && missedSched.missed > 0) {
+      suggestions.push(forStudent
+        ? (L === 'vi' ? '📅 Bạn bỏ ' + missedSched.missed + ' buổi theo lịch tuần này — học bù hôm nay nhé' : '📅 You missed ' + missedSched.missed + ' scheduled session(s) this week — catch up today')
+        : (L === 'vi' ? 'Bỏ ' + missedSched.missed + '/' + missedSched.planned + ' buổi theo lịch tuần này — nhắc nhé' : 'Missed ' + missedSched.missed + '/' + missedSched.planned + ' scheduled sessions this week — nudge them'));
+    }
     if (weakTopics.length) {
       const wt = weakTopics[0];
       if (forStudent) {

@@ -316,6 +316,11 @@
       container.querySelector('#pdSets').addEventListener('click', renderPicker);
     }
 
+    // Deep link (e.g. from a roadmap item): open a set directly.
+    if (opts.setId) {
+      set = sets.find((s) => s.id === opts.setId) || null;
+      if (set) { idx = 0; scores = []; renderCard(); return; }
+    }
     renderPicker();
   }
 

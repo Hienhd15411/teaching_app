@@ -52,7 +52,13 @@
         renderGame(params);
         break;
       case 'interview':
-        InterviewGame.start({ container: appEl, onExit: () => navigate('topics') });
+        InterviewGame.start({ container: appEl, onExit: () => navigate('topics'), sections: params && params.sections });
+        break;
+      case 'placement':
+        Placement.start({ container: appEl, onDone: () => navigate('progress'), onExit: () => navigate('progress') });
+        break;
+      case 'drill':
+        PronDrill.start({ container: appEl, onExit: () => navigate('progress'), setId: params && params.setId });
         break;
       default:
         renderTopics();
@@ -152,6 +158,7 @@
 
     appEl.innerHTML = `
       <section class="view">
+        ${renderTopicsPrompt(progress, lang)}
         <div class="topics-header">
           <div>
             <h1>${t('topics.title')}</h1>
@@ -396,6 +403,8 @@
       appEl.innerHTML = `
         <section class="view">
           <h1>${t('progress.title')}</h1>
+          ${renderPlacementCard(progress, lang)}
+          ${renderScheduleCard(progress, lang)}
           <div class="empty-state">${t('progress.empty')}</div>
           <div style="text-align:center;">
             <button class="btn" id="goTopics">${t('nav.topics')}</button>
@@ -403,6 +412,7 @@
         </section>
       `;
       appEl.querySelector('#goTopics').addEventListener('click', () => navigate('topics'));
+      wirePlacementAndSchedule(progress);
       return;
     }
 
@@ -538,6 +548,8 @@
       <section class="view">
         <h1>${t('progress.title')}</h1>
         ${coachHtml}
+        ${renderPlacementCard(progress, lang)}
+        ${renderScheduleCard(progress, lang)}
 
         <div class="progress-grid">
           <div class="stat-card">
@@ -604,6 +616,7 @@
     }
 
     appendTuitionReminder();
+    wirePlacementAndSchedule(progress);
 
     appEl.querySelector('#exportBtn').addEventListener('click', () => {
       const data = Storage.exportProfile();
@@ -676,6 +689,190 @@
     const li = document.createElement('li');
     li.textContent = msg;
     list.appendChild(li);
+  }
+
+  // ========== Placement / roadmap / schedule cards ==========
+
+  function renderPlacementCard(progress, lang) {
+    const t = I18N.t;
+    if (typeof Placement === 'undefined') return '';
+    const L = lang === 'en' ? 'en' : 'vi';
+    if (!progress.placement || !progress.roadmap) {
+      return `
+        <div class="plan-card plan-cta">
+          <div class="plan-cta-icon">🎯</div>
+          <div>
+            <div class="plan-title">${t('pl.ctaTitle')}</div>
+            <div class="muted-note">${t('pl.ctaSub')}</div>
+          </div>
+          <button class="btn" type="button" id="plGo">${t('pl.ctaBtn')} →</button>
+        </div>`;
+    }
+    const pl = progress.placement;
+    const lvl = (PLACEMENT_BANK.LEVELS.find((x) => x.id === pl.level) || PLACEMENT_BANK.LEVELS[1]);
+    const st = Placement.roadmapStatus(progress);
+    const weeks = st.weeks.map((w, wi) => `
+      <div class="plan-week">
+        <div class="plan-week-title">${escapeHtml(w.title[L] || w.title.vi)}
+          <span class="muted-note" style="display:inline;">${w.items.filter((i) => i.done).length}/${w.items.length}</span></div>
+        ${w.items.map((it) => {
+          const d = Placement.describeItem(it, lang);
+          return `<div class="plan-item ${it.done ? 'done' : ''}">
+            <button class="plan-tick" type="button" data-tick="${it.id}" title="${t('pl.tick')}">${it.done ? '✅' : '⬜'}</button>
+            <button class="plan-go" type="button" data-go="${it.id}" data-type="${it.type}" data-target="${escapeHtml(it.target)}">
+              <span>${d.icon}</span><span class="plan-kind">${escapeHtml(d.kind)}</span><span>${escapeHtml(d.label)}</span>
+            </button>
+          </div>`;
+        }).join('')}
+      </div>`).join('');
+    return `
+      <div class="plan-card">
+        <div class="plan-head">
+          <div>
+            <div class="plan-title">${lvl.icon} ${t('pl.yourLevel')}: <strong>${escapeHtml(lvl.label[L])}</strong>
+              <span class="muted-note" style="display:inline;">· TOEIC ≈ ${escapeHtml(pl.toeic)}</span></div>
+            <div class="muted-note">${t('pl.roadmapTitle')} · ${st.done}/${st.total} ${t('pl.itemsDone')}</div>
+          </div>
+          <div class="btn-row">
+            <span class="mini-bar" style="width:120px;"><span style="width:${st.pct}%"></span></span>
+            <button class="btn secondary" type="button" id="plRetake">🔁 ${t('pl.retake')}</button>
+          </div>
+        </div>
+        <div class="plan-weeks">${weeks}</div>
+      </div>`;
+  }
+
+  function renderScheduleCard(progress, lang) {
+    const t = I18N.t;
+    if (typeof Placement === 'undefined') return '';
+    const S = Placement.Schedule;
+    const sch = S.get(progress);
+    const L = (typeof Billing !== 'undefined' && Billing.DAY_LABELS) ? Billing.DAY_LABELS[lang === 'en' ? 'en' : 'vi'] : null;
+    const order = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    const dayLabel = (k) => (L ? L[k] : k);
+    const state = S.todayState(progress);
+    const todayBanner = state
+      ? (state.studied
+        ? `<div class="attn-empty" style="margin-bottom:10px;">✅ ${t('pl.todayDone')}</div>`
+        : `<div class="coach-banner" style="margin-bottom:10px;">⏰ ${state.overdue ? t('pl.todayOverdue') : t('pl.todayPlanned')} <strong>${escapeHtml(state.time)}</strong> · ${state.minutes} ${t('pl.min')}</div>`)
+      : '';
+    const missed = S.missedThisWeek(progress);
+    const missedNote = sch && missed.missed
+      ? `<div class="muted-note" style="color:var(--danger);">⚠️ ${t('pl.missedWeek').replace('{n}', missed.missed)}</div>` : '';
+    const notifSupported = typeof Notification !== 'undefined';
+    const notifState = notifSupported ? Notification.permission : 'unsupported';
+    return `
+      <div class="plan-card">
+        ${todayBanner}
+        <div class="plan-head">
+          <div>
+            <div class="plan-title">📅 ${t('pl.scheduleTitle')}</div>
+            <div class="muted-note">${sch ? escapeHtml(sch.days.map(dayLabel).join(', ')) + ' · ' + escapeHtml(sch.time) + ' · ' + sch.minutes + ' ' + t('pl.min') : t('pl.scheduleSub')}</div>
+            ${missedNote}
+          </div>
+          <button class="btn secondary" type="button" id="schEdit">${sch ? '✏️ ' + t('bill.editPlan') : '+ ' + t('pl.setSchedule')}</button>
+        </div>
+        <div id="schForm" class="sch-form" hidden>
+          <div class="btn-row">${order.map((k) => `<button type="button" class="voice-pill sch-day ${sch && sch.days.indexOf(k) >= 0 ? 'active' : ''}" data-day="${k}">${dayLabel(k)}</button>`).join('')}</div>
+          <div class="btn-row" style="margin-top:8px;align-items:center;">
+            <label class="muted-note">${t('pl.at')}</label><input type="time" id="schTime" value="${sch ? escapeHtml(sch.time) : '20:00'}" class="bill-select" style="width:auto;" />
+            <label class="muted-note">${t('pl.duration')}</label>
+            <select id="schMin" class="bill-select" style="width:auto;">${[10, 15, 20, 30, 45, 60].map((m) => `<option value="${m}" ${sch && sch.minutes === m ? 'selected' : (!sch && m === 20 ? 'selected' : '')}>${m} ${t('pl.min')}</option>`).join('')}</select>
+          </div>
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn" type="button" id="schSave">${t('bill.save')}</button>
+            ${sch ? `<button class="btn secondary" type="button" id="schIcs">📲 ${t('pl.addToCalendar')}</button>` : ''}
+            ${notifState === 'granted' ? `<span class="muted-note">🔔 ${t('pl.notifOn')}</span>`
+              : notifState === 'unsupported' ? '' : `<button class="btn secondary" type="button" id="schNotif">🔔 ${t('pl.notifAsk')}</button>`}
+          </div>
+          <div class="muted-note" style="margin-top:8px;">${t('pl.calendarHint')}</div>
+        </div>
+      </div>`;
+  }
+
+  function renderTopicsPrompt(progress, lang) {
+    const t = I18N.t;
+    if (typeof Placement === 'undefined') return '';
+    const S = Placement.Schedule;
+    const state = S.todayState(progress);
+    let html = '';
+    if (state && !state.studied) {
+      html += `<div class="coach-banner" style="margin-bottom:14px;">⏰ ${state.overdue ? t('pl.todayOverdue') : t('pl.todayPlanned')} <strong>${escapeHtml(state.time)}</strong> · ${state.minutes} ${t('pl.min')}</div>`;
+    }
+    if (!progress.placement) {
+      html += `
+        <div class="plan-card plan-cta" style="margin-bottom:16px;">
+          <div class="plan-cta-icon">🎯</div>
+          <div>
+            <div class="plan-title">${t('pl.ctaTitle')}</div>
+            <div class="muted-note">${t('pl.ctaSub')}</div>
+          </div>
+          <button class="btn" type="button" id="plGo">${t('pl.ctaBtn')} →</button>
+        </div>`;
+    }
+    return html;
+  }
+
+  function renderTeacherPlanRow(p, lang) {
+    const t = I18N.t;
+    if (typeof Placement === 'undefined') return '';
+    const st = Placement.roadmapStatus(p);
+    const sch = Placement.Schedule.get(p);
+    const missed = sch ? Placement.Schedule.missedThisWeek(p) : null;
+    const L = (typeof Billing !== 'undefined' && Billing.DAY_LABELS) ? Billing.DAY_LABELS[lang === 'en' ? 'en' : 'vi'] : null;
+    if (!st && !sch) return '';
+    return `
+      <div class="member-row" style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;display:block;">
+        ${st ? `<div>🗺️ ${t('pl.roadmapTitle')}: <strong>${st.done}/${st.total}</strong> (${st.pct}%)</div>` : ''}
+        ${sch ? `<div>📅 ${t('pl.scheduleTitle')}: ${escapeHtml(sch.days.map((k) => (L ? L[k] : k)).join(', '))} · ${escapeHtml(sch.time)}
+          ${missed && missed.missed ? `<span style="color:var(--danger);font-weight:700;"> · ${t('pl.missedWeek').replace('{n}', missed.missed)}</span>` : ''}</div>` : ''}
+      </div>`;
+  }
+
+  function wirePlacementAndSchedule(progress) {
+    const t = I18N.t;
+    if (typeof Placement === 'undefined') return;
+    appEl.querySelectorAll('#plGo').forEach((b) => b.addEventListener('click', () => navigate('placement')));
+    const retake = appEl.querySelector('#plRetake');
+    if (retake) retake.addEventListener('click', () => { if (confirm(t('pl.retakeConfirm'))) navigate('placement'); });
+    appEl.querySelectorAll('[data-tick]').forEach((b) => b.addEventListener('click', () => {
+      Placement.toggleManual(b.getAttribute('data-tick'));
+      navigate('progress', null, { fromPop: true });
+    }));
+    appEl.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => {
+      const type = b.getAttribute('data-type');
+      const target = b.getAttribute('data-target');
+      if (type === 'topic') navigate('topic', { topicId: target });
+      else if (type === 'toeic') navigate('toeic-part', { editionId: '2024', partId: target });
+      else if (type === 'interview') navigate('interview', { sections: [target] });
+      else if (type === 'drill') navigate('drill', { setId: target });
+    }));
+
+    const form = appEl.querySelector('#schForm');
+    const editBtn = appEl.querySelector('#schEdit');
+    if (editBtn && form) editBtn.addEventListener('click', () => { form.hidden = !form.hidden; });
+    appEl.querySelectorAll('.sch-day').forEach((d) => d.addEventListener('click', () => d.classList.toggle('active')));
+    const save = appEl.querySelector('#schSave');
+    if (save) save.addEventListener('click', () => {
+      const days = Array.from(appEl.querySelectorAll('.sch-day.active')).map((d) => d.getAttribute('data-day'));
+      if (!days.length) { toast(t('pl.pickDays')); return; }
+      Placement.Schedule.save({
+        days, time: appEl.querySelector('#schTime').value || '20:00',
+        minutes: Number(appEl.querySelector('#schMin').value) || 20,
+        remind: true, updatedAt: Date.now(),
+      });
+      toast('✅ ' + t('pl.scheduleSaved'));
+      navigate('progress', null, { fromPop: true });
+    });
+    const ics = appEl.querySelector('#schIcs');
+    if (ics) ics.addEventListener('click', () => Placement.Schedule.downloadIcs(Placement.Schedule.get(Storage.getProgress())));
+    const notif = appEl.querySelector('#schNotif');
+    if (notif) notif.addEventListener('click', async () => {
+      const r = await Placement.Schedule.requestPermission();
+      toast(r === 'granted' ? '🔔 ' + t('pl.notifOn') : t('pl.notifDenied'));
+      if (r === 'granted') Placement.Schedule.startInPageNotifier();
+      navigate('progress', null, { fromPop: true });
+    });
   }
 
   // ========== TOEIC views ==========
@@ -1214,7 +1411,9 @@
           ${chip(t('class.streak'), '🔥 ' + streak)}
           ${chip(t('class.accuracyCol'), insights.accuracy == null ? '—' : insights.accuracy + '%')}
           ${chip(t('class.mastered'), mastered + '/' + wordsSeen)}
+          ${p.placement ? chip(t('pl.levelShort'), p.placement.level + ' · TOEIC ' + p.placement.toeic) : ''}
         </div>
+        ${renderTeacherPlanRow(p, lang)}
         <label class="member-row" id="ivFlagRow" hidden style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
           <input type="checkbox" id="ivFlagCb" />
           <span>✈️ ${t('class.interviewAccess')}</span>
@@ -1457,6 +1656,7 @@
           renderHeader();
           syncClassNav();
           syncInterviewNav();
+          if (typeof Placement !== 'undefined') Placement.Schedule.startInPageNotifier();
           if (currentView === 'profile' || !currentView) navigate('topics');
           hydrateLocalFromCloud(user).catch((e) => console.warn('[app] hydrate error', e));
         } else {
@@ -1560,6 +1760,20 @@
     out.streak = Math.max(a.streak || 0, b.streak || 0);
     out.lastActiveDate = [a.lastActiveDate, b.lastActiveDate].filter(Boolean).sort().pop() || null;
     out.badges = Array.from(new Set([].concat(a.badges || [], b.badges || [])));
+    // Placement / roadmap / schedule: newest wins (roadmap keeps manual
+    // ticks from both sides when it's the same roadmap).
+    const newer = (x, y, key) => ((y && y[key]) || 0) > ((x && x[key]) || 0) ? y : x;
+    out.placement = newer(a.placement, b.placement, 'takenAt') || undefined;
+    const rm = newer(a.roadmap, b.roadmap, 'createdAt');
+    if (rm) {
+      out.roadmap = JSON.parse(JSON.stringify(rm));
+      if (a.roadmap && b.roadmap && a.roadmap.createdAt === b.roadmap.createdAt) {
+        out.roadmap.manual = Object.assign({}, a.roadmap.manual || {}, b.roadmap.manual || {});
+      }
+    }
+    out.schedule = newer(a.schedule, b.schedule, 'updatedAt') || undefined;
+    if (out.placement === undefined) delete out.placement;
+    if (out.schedule === undefined) delete out.schedule;
 
     const wordKeys = new Set([].concat(Object.keys(a.perWord || {}), Object.keys(b.perWord || {})));
     wordKeys.forEach((k) => {

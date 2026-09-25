@@ -211,7 +211,12 @@
       </section>
     `;
     container.querySelectorAll('.iv-airline-card').forEach((btn) => {
-      btn.addEventListener('click', () => pickSections(opts, btn.getAttribute('data-airline')));
+      btn.addEventListener('click', () => {
+        const aid = btn.getAttribute('data-airline');
+        // Preset sections (e.g. from a roadmap item) skip the section picker.
+        if (opts.sections && opts.sections.length) runSession(opts, aid);
+        else pickSections(opts, aid);
+      });
     });
     const rb = container.querySelector('#ivReviewBank');
     if (rb) rb.addEventListener('click', () => renderBank(opts));

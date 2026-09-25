@@ -91,6 +91,20 @@
     p.lastActiveDate = ymd(new Date(now - day)); // yesterday → first demo play extends the streak
     p.badges = ['firstWord', 'words100', 'streak3', 'flashcardFirst', 'quizFirst', 'matchingFirst'];
     p.level = Progress.computeLevel(p.xp).level;
+
+    // Placement + roadmap + schedule so the Tiến độ tab tells the whole
+    // story in a demo (B1 level, roadmap partly done, Tue/Thu/Sat 20:00).
+    if (typeof global.Placement !== 'undefined' && typeof global.PLACEMENT_BANK !== 'undefined') {
+      p.placement = {
+        takenAt: now - 12 * day, score: 58, level: 'B1', toeic: '500 – 700',
+        vocabPct: 65, grammarPct: 50, speakingPct: 62,
+        tiers: { vocab: { easy: 86, medium: 57, hard: 33 }, grammar: { easy: 75, medium: 33, hard: 33 } },
+      };
+      p.roadmap = global.Placement.generateRoadmap('B1');
+      p.roadmap.createdAt = now - 12 * day;
+      p.roadmap.manual = { w1i4: true };
+      p.schedule = { days: ['tue', 'thu', 'sat'], time: '20:00', minutes: 20, remind: true, updatedAt: now - 12 * day };
+    }
     return p;
   }
 
@@ -228,6 +242,10 @@
           perTopic,
           history,
           badges: [],
+          // A few students have a study schedule so the dashboard shows
+          // the "missed scheduled sessions" insight.
+          schedule: i % 3 === 0 ? { days: ['mon', 'wed', 'fri'], time: '20:00', minutes: 20, remind: true, updatedAt: now - 20 * day } : undefined,
+          placement: i < 6 ? { takenAt: now - 30 * day, score: [78, 74, 61, 58, 55, 47][i], level: ['B2', 'B2', 'B1', 'B1', 'B1', 'B1'][i], toeic: i < 2 ? '700 – 850+' : '500 – 700', vocabPct: 70, grammarPct: 60, speakingPct: 60 } : undefined,
         },
         updatedAt: now - s.daysAgo * day,
       };

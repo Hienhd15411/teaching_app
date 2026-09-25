@@ -1446,6 +1446,37 @@ input[type="text"]:focus { border-color: var(--primary); }
   white-space: nowrap;
 }
 
+/* Placement / roadmap / schedule cards */
+.plan-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px;
+}
+.plan-cta {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  border-left: 4px solid var(--primary); background: rgba(0, 102, 204, 0.05);
+}
+.plan-cta > div:nth-child(2) { flex: 1; min-width: 200px; }
+.plan-cta-icon { font-size: 36px; }
+.plan-title { font-weight: 700; font-size: 16px; }
+.plan-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.plan-weeks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+.plan-week { background: var(--bg-soft); border-radius: 10px; padding: 10px 12px; }
+.plan-week-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; display: flex; justify-content: space-between; }
+.plan-item { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.plan-item.done .plan-go { opacity: 0.55; text-decoration: line-through; }
+.plan-tick { background: transparent; border: none; font-size: 16px; padding: 2px; cursor: pointer; }
+.plan-go {
+  flex: 1; display: flex; align-items: center; gap: 6px; text-align: left;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-size: 13px; cursor: pointer;
+}
+.plan-go:hover { border-color: var(--primary); }
+.plan-kind { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+.sch-form { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.pl-intro { text-align: center; max-width: 560px; margin: 30px auto; }
+.pl-intro .big { font-size: 56px; }
+.pl-steps { text-align: left; display: inline-block; margin: 8px auto; line-height: 1.9; }
+
 /* Personal coaching banner on the student's Progress view */
 .coach-banner {
   background: rgba(0, 102, 204, 0.06);
