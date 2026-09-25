@@ -1163,6 +1163,13 @@ input[type="text"]:focus { border-color: var(--primary); }
 }
 .attn-chip.high { background: rgba(185, 28, 28, 0.12); color: var(--danger); }
 .attn-chip.watch { background: rgba(178, 94, 0, 0.12); color: var(--warning); }
+.attn-chip.ok { background: rgba(26, 140, 58, 0.12); color: var(--success); }
+
+/* Teacher Google Calendar panel (Học phí tab) */
+.gcal-card { margin: 4px 0 18px; }
+.gcal-card .plan-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gcal-legend { display: grid; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--ink-muted-80); line-height: 1.5; }
+.gcal-legend strong { color: var(--ink); }
 .attn-suggestion { font-size: 13px; color: var(--ink-muted-80); line-height: 1.4; }
 .attn-empty {
   background: rgba(26, 140, 58, 0.08);

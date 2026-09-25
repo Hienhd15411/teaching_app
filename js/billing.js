@@ -4,18 +4,21 @@
   // Tuition (học phí) data layer.
   //
   //   /billing/{uid} = {
-  //     plan: { type: '1v1'|'group', ratePerSession, packageSize, groupId? },
+  //     plan: { type: '1v1'|'group', ratePerSession, packageSize, duration?, groupId? },
   //     schedule: { mon: '18:00', ... },        // prefill only, never auto-counts
   //     payments:   { pushId: { date, amount, sessions, note, ts } },
   //     attendance: { 'YYYY-MM-DD': { status, counted, ts } },  // 1 record/day
   //   }
-  //   /groups/{gid} = { name, ratePerSession, packageSize, schedule, members: {uid:true} }
-  //   /billing_settings = { countRules: { '1v1': {absent,excused}, group: {absent,excused} } }
+  //   /groups/{gid} = { name, ratePerSession, packageSize, duration?, schedule, members: {uid:true} }
+  //   /billing_settings = { countRules: { '1v1': {absent,excused}, group: {absent,excused} },
+  //                         gcal: { calendarId, digestTime, lastSyncAt, lastSyncCount } }
   //
   // Prepaid model: remaining = sum(payments.sessions) - count(attendance where counted).
   // Whether an absence counts is decided AT MARKING TIME from the current
   // rules and frozen into the record — changing the rules later never
   // rewrites past billing.
+
+  const DEFAULT_DURATION = 60; // minutes per class (used for calendar events)
 
   const DEFAULT_SETTINGS = {
     countRules: {
@@ -67,6 +70,9 @@
         }
       });
     }
+    // Google Calendar sync state (calendarId, digestTime, lastSyncAt…) —
+    // written by js/gcal.js via saveGcalSettings, passed through untouched.
+    if (s && s.gcal && typeof s.gcal === 'object') out.gcal = Object.assign({}, s.gcal);
     return out;
   }
 
@@ -100,6 +106,7 @@
         groupName: g.name,
         ratePerSession: g.ratePerSession || 0,
         packageSize: g.packageSize || 8,
+        duration: g.duration || DEFAULT_DURATION,
         schedule: g.schedule || {},
       };
     }
@@ -107,6 +114,7 @@
       type: '1v1',
       ratePerSession: plan.ratePerSession || 0,
       packageSize: plan.packageSize || 8,
+      duration: plan.duration || DEFAULT_DURATION,
       schedule: (b && b.schedule) || {},
     };
   }
@@ -174,10 +182,18 @@
     await d.ref('groups/' + gid).remove();
   }
 
+  // Only the deduction rules — never clobbers /billing_settings/gcal.
   async function saveSettings(settings) {
     const d = db();
     if (!d) throw new Error('offline');
-    await d.ref('billing_settings').set(normalizeSettings(settings));
+    await d.ref('billing_settings/countRules').set(normalizeSettings(settings).countRules);
+  }
+
+  // Merge-patch the Google Calendar sync state.
+  async function saveGcalSettings(patch) {
+    const d = db();
+    if (!d) throw new Error('offline');
+    await d.ref('billing_settings/gcal').update(patch || {});
   }
 
   // ---------- misc helpers ----------
@@ -218,7 +234,9 @@
     saveGroup,
     deleteGroup,
     saveSettings,
+    saveGcalSettings,
     normalizeSettings,
+    DEFAULT_DURATION,
     fmtVnd,
     dayKeyOf,
     scheduleLabel,

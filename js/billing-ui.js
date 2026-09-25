@@ -11,7 +11,8 @@
   //   data: { billing, groups, settings },
   //   api: Billing-compatible object,
   //   lang: 'vi'|'en',
-  //   reload: async () => void,                        // refetch + rerender
+  //   reload: async () => void,                        // refetch + rerender (+ GCal autoSync)
+  //   allowGcal: boolean,                              // false for the demo account
   // }
 
   function esc(str) {
@@ -330,6 +331,7 @@
         <button class="btn secondary" id="billSettingsBtn">⚙️ ${t('bill.rules')}</button>
       </div>
       ${dueHtml}
+      ${renderGcalPanel(ctx)}
       <div class="bill-toolbar">
         <h3 style="margin:0;">${t('bill.groups')} (${Object.keys(groups).length})</h3>
         <button class="btn secondary" id="newGroupBtn">+ ${t('bill.newGroup')}</button>
@@ -349,6 +351,7 @@
 
     container.querySelector('#billSettingsBtn').addEventListener('click', () => openSettingsModal(ctx));
     container.querySelector('#newGroupBtn').addEventListener('click', () => openGroupModal(ctx, null));
+    wireGcalPanel(container, ctx);
     container.querySelectorAll('.group-card').forEach((el) => {
       el.addEventListener('click', () => openGroupModal(ctx, el.getAttribute('data-gid')));
     });
@@ -395,6 +398,103 @@
     }
   }
 
+  // ---- Google Calendar panel ----
+  //
+  // Two kinds of events go to the teacher's calendar (see js/gcal.js):
+  //   • class slots — detailed, one recurring event per weekday slot;
+  //   • tuition — ONE digest per day at the digest time listing everyone
+  //     who has class that day and ≤ 2 sessions left.
+
+  function renderGcalPanel(ctx) {
+    if (ctx.allowGcal === false || typeof GCal === 'undefined') return '';
+    const st = GCal.status();
+    const g = (ctx.data.settings && ctx.data.settings.gcal) || {};
+    const digestTime = g.digestTime || GCal.DEFAULT_DIGEST_TIME;
+    if (!st.configured) {
+      return `
+        <div class="plan-card gcal-card">
+          <div class="plan-head">
+            <div>
+              <div class="plan-title">📅 ${t('gcal.title')}</div>
+              <div class="muted-note">${t('gcal.notConfigured')}</div>
+            </div>
+          </div>
+        </div>`;
+    }
+    const last = g.lastSyncAt ? new Date(g.lastSyncAt) : null;
+    const lastLabel = last
+      ? `${t('gcal.lastSync')} ${String(last.getHours()).padStart(2, '0')}:${String(last.getMinutes()).padStart(2, '0')} ${fmtDate(g.lastSyncAt)} · ${g.lastSyncCount || 0} ${t('gcal.events')}`
+      : t('gcal.neverSynced');
+    return `
+      <div class="plan-card gcal-card">
+        <div class="plan-head">
+          <div>
+            <div class="plan-title">📅 ${t('gcal.title')} ${st.connected ? `<span class="attn-chip ok">${t('gcal.connected')}</span>` : `<span class="attn-chip watch">${t('gcal.disconnected')}</span>`}</div>
+            <div class="muted-note">${st.connected ? lastLabel : t('gcal.sub')}</div>
+          </div>
+          <div class="btn-row">
+            ${st.connected
+              ? `<button class="btn" type="button" id="gcalSync">🔄 ${t('gcal.syncNow')}</button>
+                 <button class="btn secondary" type="button" id="gcalDisconnect">${t('gcal.disconnect')}</button>`
+              : `<button class="btn" type="button" id="gcalConnect">🔗 ${t('gcal.connect')}</button>`}
+          </div>
+        </div>
+        <div class="gcal-legend">
+          <div>📚/👥 <strong>${t('gcal.classEvents')}</strong> — ${t('gcal.classEventsSub')}</div>
+          <div>💰 <strong>${t('gcal.digest')}</strong> — ${t('gcal.digestSub')}
+            <label class="muted-note" style="display:inline-flex;align-items:center;gap:6px;margin-left:6px;">${t('gcal.digestAt')}
+              <input type="time" id="gcalDigestTime" class="bill-select" style="width:auto;" value="${esc(digestTime)}" ${st.connected ? '' : 'disabled'} />
+            </label>
+          </div>
+        </div>
+        <div class="muted-note" id="gcalMsg" style="margin-top:6px;"></div>
+      </div>`;
+  }
+
+  function wireGcalPanel(container, ctx) {
+    if (typeof GCal === 'undefined') return;
+    const msg = container.querySelector('#gcalMsg');
+    const say = (text) => { if (msg) msg.textContent = text; };
+    const describe = (r) => t('gcal.syncDone')
+      .replace('{n}', r.count)
+      .replace('{i}', r.stats.inserted).replace('{u}', r.stats.updated).replace('{d}', r.stats.deleted);
+    const explain = (e) => {
+      const code = (e && e.message) || '';
+      if (GCal.isAuthError(e)) return t('gcal.needAuth');
+      if (code === 'GCAL_GIS_UNAVAILABLE') return t('gcal.gisBlocked');
+      if (/invalid_scope|invalid_client|origin_mismatch|redirect_uri_mismatch|idpiframe/.test(code)) return t('gcal.badClient') + ' (' + code + ')';
+      return '❌ ' + code;
+    };
+    const run = async (interactive) => {
+      say('⏳ ' + t('gcal.syncing'));
+      try {
+        const r = interactive ? await GCal.connect(ctx) : await GCal.sync(ctx, { interactive: false });
+        App.toast('📅 ' + describe(r));
+        await ctx.reload({ skipGcal: true }); // just synced — don't queue another
+      } catch (e) { say(explain(e)); }
+    };
+    const c = container.querySelector('#gcalConnect');
+    if (c) c.addEventListener('click', () => run(true));
+    const s = container.querySelector('#gcalSync');
+    if (s) s.addEventListener('click', () => run(true));
+    const d = container.querySelector('#gcalDisconnect');
+    if (d) d.addEventListener('click', async () => {
+      if (!confirm(t('gcal.confirmDisconnect'))) return;
+      await GCal.disconnect();
+      App.toast(t('gcal.disconnectedToast'));
+      await ctx.reload({ skipGcal: true });
+    });
+    const tm = container.querySelector('#gcalDigestTime');
+    if (tm) tm.addEventListener('change', async () => {
+      const v = tm.value || GCal.DEFAULT_DIGEST_TIME;
+      try {
+        await ctx.api.saveGcalSettings({ digestTime: v });
+        App.toast('✅ ' + t('gcal.digestSaved').replace('{t}', v));
+        await ctx.reload(); // reload → autoSync pushes the new time
+      } catch (e) { App.toast('❌ ' + (e && e.message || 'error')); }
+    });
+  }
+
   // ---- plan modal (per-student config) ----
 
   function openPlanModal(ctx, uid) {
@@ -431,6 +531,9 @@
           <label>${t('bill.schedule')}</label>
           <div class="btn-row">${dayChips}</div>
           <div id="timeInputs"></div>
+          <label>${t('bill.duration')}</label>
+          <select id="durInput" class="bill-select" style="width:auto;">${[45, 60, 90, 120].map((n) =>
+            `<option value="${n}" ${(plan.duration || Billing.DEFAULT_DURATION) === n ? 'selected' : ''}>${n} ${t('bill.minutes')}</option>`).join('')}</select>
         </div>
         <div id="groupFields" ${plan.type !== 'group' ? 'hidden' : ''}>
           <label>${t('bill.chooseGroup')}</label>
@@ -491,7 +594,8 @@
       } else {
         const rate = parseInt(String(m.el.querySelector('#rateInput').value).replace(/\D/g, ''), 10) || 0;
         const custom = parseInt(String(m.el.querySelector('#pkgCustom').value).replace(/\D/g, ''), 10);
-        newPlan = { type: '1v1', ratePerSession: rate, packageSize: custom > 0 ? custom : pkg };
+        const duration = parseInt(m.el.querySelector('#durInput').value, 10) || Billing.DEFAULT_DURATION;
+        newPlan = { type: '1v1', ratePerSession: rate, packageSize: custom > 0 ? custom : pkg, duration };
       }
       try {
         await api.saveStudentPlan(uid, newPlan, type === 'group' ? {} : sched);
@@ -597,6 +701,9 @@
         <div class="btn-row">${DAY_ORDER.map((k) =>
           `<button type="button" class="voice-pill day-chip ${sched[k] !== undefined ? 'active' : ''}" data-day="${k}">${L[k]}</button>`).join('')}</div>
         <div id="gTimeInputs"></div>
+        <label>${t('bill.duration')}</label>
+        <select id="gDur" class="bill-select" style="width:auto;">${[45, 60, 90, 120].map((n) =>
+          `<option value="${n}" ${(g.duration || Billing.DEFAULT_DURATION) === n ? 'selected' : ''}>${n} ${t('bill.minutes')}</option>`).join('')}</select>
         <label>${t('bill.members')} (<span id="memberCount">${Object.keys(members).length}</span>)</label>
         <input type="text" id="memberSearch" placeholder="🔍 ${t('bill.searchStudent')}" />
         <div class="btn-row" style="margin:6px 0;">
@@ -702,8 +809,9 @@
       if (!name) { App.toast(t('bill.needName')); return; }
       const rate = parseInt(String(m.el.querySelector('#gRate').value).replace(/\D/g, ''), 10) || 0;
       const pkg = parseInt(String(m.el.querySelector('#gPkg').value).replace(/\D/g, ''), 10) || 8;
+      const duration = parseInt(m.el.querySelector('#gDur').value, 10) || Billing.DEFAULT_DURATION;
       try {
-        const savedGid = await api.saveGroup(gid, { name, ratePerSession: rate, packageSize: pkg, schedule: sched, members });
+        const savedGid = await api.saveGroup(gid, { name, ratePerSession: rate, packageSize: pkg, duration, schedule: sched, members });
         // Point every member's plan at this group.
         for (const uid of Object.keys(members)) {
           await api.saveStudentPlan(uid, { type: 'group', groupId: savedGid }, undefined);

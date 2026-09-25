@@ -71,4 +71,10 @@
   global.DEMO_ACCOUNTS = [
     'demo@vocabquest.app',
   ];
+
+  // Google Calendar sync for the teacher (class slots + daily tuition digest).
+  // Leave empty to hide the feature. Setup guide: docs/GOOGLE-CALENDAR.md
+  // (Google Cloud Console → same project as Firebase → OAuth Client ID, Web).
+  // Looks like: '1055636163241-xxxxxxxxxxxxxxxx.apps.googleusercontent.com'
+  global.GOOGLE_CALENDAR_CLIENT_ID = '';
 })(window);

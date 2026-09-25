@@ -59,6 +59,10 @@ Mở `js/data/vocab.js`, thêm entry vào mảng của chủ đề tương ứng
 
 Yêu cầu học viên vào **Tiến độ → ⬇️ Xuất dữ liệu**, gửi file JSON qua Zalo/email. Giáo viên có thể mở file đó để xem chi tiết, hoặc Import vào máy mình để "xem lại" profile đó.
 
+### Nhắc lịch dạy & thu học phí trên Google Calendar
+
+Tab **Lớp học → Học phí** có khối **📅 Google Calendar**: đẩy từng khung giờ dạy (lặp hàng tuần, nhắc trước 15') và **một nhắc tổng hợp mỗi sáng** liệt kê học viên cần thu học phí hôm đó lên lịch riêng của giáo viên. Cài đặt 1 lần theo `docs/GOOGLE-CALENDAR.md` (tạo OAuth Client ID trong Google Cloud, dán vào `js/firebase-config.js`).
+
 ## Quy tắc điểm (gamification)
 
 | Hành động              | XP  |

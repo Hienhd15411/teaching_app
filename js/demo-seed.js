@@ -387,6 +387,7 @@
       },
       deleteGroup: (gid) => { delete st.groups[gid]; return ok(); },
       saveSettings: (settings) => { st.settings = Billing.normalizeSettings(settings); return ok(); },
+      saveGcalSettings: (patch) => { st.settings.gcal = Object.assign({}, st.settings.gcal || {}, patch); return ok(); },
     };
   }
 

@@ -1345,19 +1345,42 @@
         }
       }
 
+      // Panel shows for real teachers (with a setup hint until a Client ID
+      // is configured); never for the demo account.
+      const allowGcal = !isDemoView() && typeof GCal !== 'undefined';
+      // Every teacher write (plan, payment, attendance, group, rules) goes
+      // through reload(), so pushing to Google Calendar here keeps it exact.
+      const gcalAfterWrite = () => {
+        if (!allowGcal || !GCal.configured() || !GCal.isConnected()) return;
+        GCal.autoSync(ctx, (err, r) => {
+          const msg = content.querySelector('#gcalMsg');
+          if (err && GCal.isAuthError(err)) toast('📅 ' + t('gcal.needAuth'));
+          else if (err) toast('📅 ❌ ' + err.message);
+          else if (msg && r) {
+            msg.textContent = '✅ ' + t('gcal.syncDone').replace('{n}', r.count)
+              .replace('{i}', r.stats.inserted).replace('{u}', r.stats.updated).replace('{d}', r.stats.deleted);
+          }
+        });
+      };
       const ctx = {
         students,
         data,
         api,
         lang: I18N.getLang(),
-        reload: async () => {
+        allowGcal,
+        reload: async (opts) => {
           ctx.data = await api.fetchAll();
           if (kind === 'billing') BillingUI.renderBillingTab(content, ctx);
           else BillingUI.renderAttendanceTab(content, ctx);
+          if (!(opts && opts.skipGcal)) gcalAfterWrite();
         },
       };
       if (kind === 'billing') BillingUI.renderBillingTab(content, ctx);
       else BillingUI.renderAttendanceTab(content, ctx);
+      // Opening the tab: refresh the calendar if the last push is stale
+      // (projections in the tuition digest move as days pass).
+      const lastSync = (data.settings && data.settings.gcal && data.settings.gcal.lastSyncAt) || 0;
+      if (Date.now() - lastSync > 30 * 60 * 1000) gcalAfterWrite();
     };
 
     const showTab = (tab) => {
