@@ -1,7 +1,7 @@
 // ============================================================
 // 7-day usage report — paste vào DevTools console
 // Yêu cầu: đã login bằng email teacher (lemytrinh1801@gmail.com)
-// và đang ở trang https://incredible-bavarois-3059ff.netlify.app
+// và đang ở trang https://letrinh-english.netlify.app
 // ============================================================
 (async () => {
   if (typeof firebase === 'undefined' || !firebase.auth) {

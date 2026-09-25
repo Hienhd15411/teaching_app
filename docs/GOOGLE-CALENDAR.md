@@ -47,7 +47,7 @@ Mọi thứ cần đưa lên lịch chỉ thay đổi khi giáo viên đang dùn
 1. **APIs & Services → Credentials → + Create credentials → OAuth client ID**.
 2. Application type: **Web application**. Name: `Vocab Quest web`.
 3. **Authorized JavaScript origins** → Add URI, thêm cả 2:
-   - `https://incredible-bavarois-3059ff.netlify.app`
+   - `https://letrinh-english.netlify.app` (đúng địa chỉ mở app, không có `/` cuối)
    - `http://localhost:8080` (chỉ để test máy local, có thể bỏ)
 4. **Authorized redirect URIs**: để trống (app dùng popup, không redirect).
 5. **Create** → copy **Client ID** (dạng
