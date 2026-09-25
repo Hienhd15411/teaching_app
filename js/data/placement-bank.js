@@ -66,26 +66,71 @@
     { id: 'B2', min: 72, label: { vi: 'Trung cao cấp (B2)', en: 'Upper-intermediate (B2)' }, toeic: '700 – 850+', icon: '🌳' },
   ];
 
+  // Conversation track samples ONLY everyday-life topics (no office /
+  // business tiers) and asks Vietnamese → English (productive recall).
+  const CONV_VOCAB_TIERS = {
+    easy: ['intro_people', 'family_home', 'daily_routines', 'food_restaurants', 'weather_leisure', 'body_parts', 'clothes_fashion'],
+    medium: ['shopping_money', 'travel_hotels', 'hobbies_freetime', 'social_expressions', 'relationships', 'health_feelings', 'directions_navigation', 'events_festivals', 'sports_fitness', 'music_arts'],
+    hard: ['emergencies_safety', 'cooking_recipes', 'city_life', 'transport', 'environment_climate'],
+  };
+
+  // Conversation "reflex" items: pick the natural reply. Original content.
+  const DIALOGUES = [
+    // easy
+    { id: 'd01', tier: 'easy', a: 'Hi, I\'m Minh. Nice to meet you.', choices: ['Nice to meet you too.', 'I\'m fine, thanks.', 'Yes, I do.', 'See you later.'], answer: 0, explain: 'Đáp lại lời giới thiệu: "Nice to meet you too."' },
+    { id: 'd02', tier: 'easy', a: 'How are you today?', choices: ['I\'m 25 years old.', 'Not bad, thanks. And you?', 'Yes, please.', 'It\'s on the left.'], answer: 1, explain: 'Hỏi thăm sức khoẻ → trả lời tình trạng rồi hỏi lại.' },
+    { id: 'd03', tier: 'easy', a: 'Would you like some coffee?', choices: ['Yes, I am.', 'No, I didn\'t.', 'Yes, please.', 'I\'m sorry to hear that.'], answer: 2, explain: 'Would you like...? → Yes, please / No, thanks.' },
+    { id: 'd04', tier: 'easy', a: 'Thank you so much for your help!', choices: ['You\'re welcome.', 'Never mind.', 'Congratulations!', 'Good luck.'], answer: 0, explain: 'Đáp lời cảm ơn: You\'re welcome / My pleasure.' },
+    { id: 'd05', tier: 'easy', a: 'Excuse me, where is the restroom?', choices: ['It\'s ten o\'clock.', 'It\'s down the hall on the right.', 'I\'m from Da Nang.', 'Yes, it is.'], answer: 1, explain: 'Hỏi đường → chỉ vị trí.' },
+    { id: 'd06', tier: 'easy', a: 'I\'m sorry, I\'m late.', choices: ['That\'s all right.', 'You\'re welcome.', 'Me too.', 'Nice to meet you.'], answer: 0, explain: 'Đáp lời xin lỗi: That\'s all right / No problem.' },
+    { id: 'd07', tier: 'easy', a: 'What do you do?', choices: ['I\'m doing well.', 'I\'m a nurse.', 'I do it every day.', 'I\'m from Hanoi.'], answer: 1, explain: '"What do you do?" hỏi nghề nghiệp.' },
+    { id: 'd08', tier: 'easy', a: 'Have a nice weekend!', choices: ['You too!', 'It was great.', 'Yes, I have.', 'Sorry?'], answer: 0, explain: 'Chúc → "You too!"' },
+    // medium
+    { id: 'd09', tier: 'medium', a: 'Could you pass me the salt, please?', choices: ['Here you are.', 'I\'m afraid not.', 'Yes, I could.', 'It\'s very salty.'], answer: 0, explain: 'Đưa đồ cho người khác: Here you are / Here you go.' },
+    { id: 'd10', tier: 'medium', a: 'Do you mind if I open the window?', choices: ['Yes, I do it.', 'Not at all, go ahead.', 'I mind it.', 'It\'s open now, thanks.'], answer: 1, explain: 'Do you mind...? → "Not at all" = đồng ý.' },
+    { id: 'd11', tier: 'medium', a: 'I failed my driving test again.', choices: ['Congratulations!', 'That\'s too bad. Better luck next time.', 'Good idea.', 'You\'re welcome.'], answer: 1, explain: 'Chia sẻ tin buồn → đồng cảm + động viên.' },
+    { id: 'd12', tier: 'medium', a: 'How about going to the cinema tonight?', choices: ['Sounds great! What time?', 'I went there.', 'It\'s a cinema.', 'Yes, it is tonight.'], answer: 0, explain: 'Lời rủ → nhận lời + hỏi chi tiết.' },
+    { id: 'd13', tier: 'medium', a: 'Sorry, I didn\'t catch that.', choices: ['I said the meeting is at three.', 'Catch it!', 'No, I didn\'t.', 'That\'s a good catch.'], answer: 0, explain: '"didn\'t catch that" = chưa nghe rõ → nhắc lại.' },
+    { id: 'd14', tier: 'medium', a: 'Can I get you anything else?', choices: ['No, that\'s all, thanks.', 'Yes, you can get.', 'Anything is fine with me.', 'I got it yesterday.'], answer: 0, explain: 'Trong nhà hàng: "No, that\'s all" = đủ rồi.' },
+    { id: 'd15', tier: 'medium', a: 'I\'ve got a job interview tomorrow.', choices: ['Good luck! You\'ll do great.', 'Have a nice trip.', 'Get well soon.', 'Same to you.'], answer: 0, explain: 'Sắp có sự kiện quan trọng → chúc may mắn.' },
+    { id: 'd16', tier: 'medium', a: 'Is this seat taken?', choices: ['Yes, I took it yesterday.', 'No, go ahead.', 'It\'s a nice seat.', 'I\'m sitting.'], answer: 1, explain: 'Hỏi chỗ ngồi còn trống → "No, go ahead."' },
+    // hard
+    { id: 'd17', tier: 'hard', a: 'I was wondering if you could cover my shift on Saturday.', choices: ['I\'d be happy to, if I\'m free.', 'Yes, I\'m wondering too.', 'The shift is on Saturday.', 'I covered it well.'], answer: 0, explain: 'Nhờ vả lịch sự → nhận lời có điều kiện.' },
+    { id: 'd18', tier: 'hard', a: 'I\'m afraid the room you booked isn\'t available.', choices: ['That\'s fine, what else do you have?', 'I\'m not afraid.', 'Yes, I booked it.', 'It is available.'], answer: 0, explain: 'Xử lý tình huống → chấp nhận + hỏi phương án khác.' },
+    { id: 'd19', tier: 'hard', a: 'To be honest, I think the price is a bit steep.', choices: ['I see your point. Could we work out a discount?', 'It\'s a steep hill.', 'Honestly, I paid.', 'The price is on the tag.'], answer: 0, explain: '"steep" = đắt → thương lượng.' },
+    { id: 'd20', tier: 'hard', a: 'Would you mind keeping it down? I\'m on a call.', choices: ['Oh, sorry about that.', 'Keep what down?', 'I\'m calling too.', 'Yes, I would.'], answer: 0, explain: 'Bị nhắc giữ trật tự → xin lỗi.' },
+    { id: 'd21', tier: 'hard', a: 'How did the presentation go?', choices: ['It went really well, thanks for asking.', 'It goes to the office.', 'I went by bus.', 'It\'s going on now.'], answer: 0, explain: '"How did it go?" hỏi kết quả → kể lại.' },
+    { id: 'd22', tier: 'hard', a: 'Let\'s play it by ear and decide later.', choices: ['Sure, that works for me.', 'I don\'t play any instrument.', 'My ears are fine.', 'Let\'s decide now then.'], answer: 0, explain: '"play it by ear" = tuỳ cơ ứng biến → đồng ý.' },
+    { id: 'd23', tier: 'hard', a: 'I can\'t make it to dinner tonight, something came up.', choices: ['No worries, let\'s reschedule.', 'Make it yourself.', 'Dinner is at seven.', 'Come up here.'], answer: 0, explain: '"something came up" = có việc đột xuất → thông cảm + hẹn lại.' },
+    { id: 'd24', tier: 'hard', a: 'Any chance you could give me a hand with these boxes?', choices: ['Of course, where do they go?', 'I have two hands.', 'There is a chance.', 'The boxes are heavy.'], answer: 0, explain: '"give me a hand" = giúp một tay → đồng ý + hỏi cụ thể.' },
+  ];
+
   // Two placement tracks. Each defines what the test samples and how the
   // composite score is weighted; ROADMAPS below are keyed by track.
   const TRACKS = {
     toeic: {
       id: 'toeic', icon: '📝',
       label: { vi: 'Test TOEIC', en: 'TOEIC test' },
-      desc: { vi: 'Từ vựng công sở + 15 câu ngữ pháp Part 5 · ra điểm TOEIC ước lượng', en: 'Business vocab + 15 Part-5 grammar items · TOEIC estimate' },
+      desc: { vi: 'Từ vựng công sở (Anh → nghĩa) + 15 câu ngữ pháp Part 5 · ra điểm TOEIC ước lượng', en: 'Business vocab (EN → meaning) + 15 Part-5 grammar items · TOEIC estimate' },
+      vocabSource: 'toeic', vocabDirection: 'en2vi',
       vocabTiers: { easy: 4, medium: 8, hard: 8 },
       grammar: { easy: 4, medium: 6, hard: 5 },
+      dialogues: null,
       speaking: 0,
-      weights: { vocab: 0.45, grammar: 0.55, speaking: 0 },
+      weights: { vocab: 0.45, second: 0.55, speaking: 0 },
+      secondLabel: { vi: 'Ngữ pháp', en: 'Grammar' },
     },
     conversation: {
       id: 'conversation', icon: '💬',
       label: { vi: 'Test Giao tiếp', en: 'Conversation test' },
-      desc: { vi: 'Từ vựng đời sống + 5 câu ngữ pháp + 2 câu nói · phần nói chiếm 50%', en: 'Everyday vocab + 5 grammar items + 2 speaking prompts · speaking is 50%' },
-      vocabTiers: { easy: 10, medium: 8, hard: 2 },
-      grammar: { easy: 3, medium: 2, hard: 0 },
+      desc: { vi: 'Từ vựng đời sống (nghĩa → tiếng Anh) + 8 câu phản xạ hội thoại + 2 câu nói · phần nói chiếm 50%', en: 'Everyday vocab (meaning → EN) + 8 dialogue-reply items + 2 speaking prompts · speaking is 50%' },
+      vocabSource: 'conversation', vocabDirection: 'vi2en',
+      vocabTiers: { easy: 8, medium: 8, hard: 4 },
+      grammar: null,
+      dialogues: { easy: 3, medium: 3, hard: 2 },
       speaking: 2,
-      weights: { vocab: 0.35, grammar: 0.15, speaking: 0.5 },
+      weights: { vocab: 0.3, second: 0.2, speaking: 0.5 },
+      secondLabel: { vi: 'Phản xạ hội thoại', en: 'Conversation reflex' },
     },
   };
 
@@ -211,5 +256,5 @@
     },
   };
 
-  global.PLACEMENT_BANK = { GRAMMAR, VOCAB_TIERS, LEVELS, TRACKS, SPEAKING_PROMPTS, ROADMAPS };
+  global.PLACEMENT_BANK = { GRAMMAR, DIALOGUES, VOCAB_TIERS, CONV_VOCAB_TIERS, LEVELS, TRACKS, SPEAKING_PROMPTS, ROADMAPS };
 })(window);

@@ -231,9 +231,10 @@
 
   // ---------- the test flow ----------
 
-  function buildVocabQuestions(perTier) {
+  function buildVocabQuestions(perTier, source) {
     const V = global.VOCAB || {};
-    const tiers = PLACEMENT_BANK.VOCAB_TIERS;
+    const tiers = source === 'conversation' && PLACEMENT_BANK.CONV_VOCAB_TIERS
+      ? PLACEMENT_BANK.CONV_VOCAB_TIERS : PLACEMENT_BANK.VOCAB_TIERS;
     const out = [];
     Object.keys(perTier).forEach((tier) => {
       const pool = [];
@@ -248,8 +249,16 @@
   }
 
   function buildGrammarQuestions(counts) {
+    if (!counts) return [];
     const G = PLACEMENT_BANK.GRAMMAR;
     const by = (tier) => shuffle(G.filter((g) => g.tier === tier));
+    return shuffle([].concat(by('easy').slice(0, counts.easy || 0), by('medium').slice(0, counts.medium || 0), by('hard').slice(0, counts.hard || 0)));
+  }
+
+  function buildDialogueQuestions(counts) {
+    if (!counts) return [];
+    const D = PLACEMENT_BANK.DIALOGUES || [];
+    const by = (tier) => shuffle(D.filter((d) => d.tier === tier));
     return shuffle([].concat(by('easy').slice(0, counts.easy || 0), by('medium').slice(0, counts.medium || 0), by('hard').slice(0, counts.hard || 0)));
   }
 
@@ -261,8 +270,9 @@
     let track = null;        // PLACEMENT_BANK.TRACKS entry
     let vocabQs = [];
     let grammarQs = [];
+    let dialogueQs = [];
     let prompts = [];
-    const answers = { vocab: [], grammar: [], speaking: [] };
+    const answers = { vocab: [], grammar: [], dialogue: [], speaking: [] };
     let stage = 'intro';
     let idx = 0;
     let recognition = null;
@@ -310,10 +320,11 @@
 
     function beginTrack(id) {
       track = PLACEMENT_BANK.TRACKS[id] || PLACEMENT_BANK.TRACKS.toeic;
-      vocabQs = buildVocabQuestions(track.vocabTiers);
+      vocabQs = buildVocabQuestions(track.vocabTiers, track.vocabSource);
       grammarQs = buildGrammarQuestions(track.grammar);
+      dialogueQs = buildDialogueQuestions(track.dialogues);
       prompts = PLACEMENT_BANK.SPEAKING_PROMPTS.slice(0, track.speaking || 0);
-      answers.vocab = []; answers.grammar = []; answers.speaking = [];
+      answers.vocab = []; answers.grammar = []; answers.dialogue = []; answers.speaking = [];
       stage = 'vocab'; idx = 0;
       renderVocab();
     }
@@ -323,14 +334,21 @@
     }
 
     function renderVocab() {
-      if (idx >= vocabQs.length) { stage = 'grammar'; idx = 0; return renderGrammar(); }
+      if (idx >= vocabQs.length) {
+        idx = 0;
+        if (dialogueQs.length) { stage = 'dialogue'; return renderDialogue(); }
+        stage = 'grammar'; return renderGrammar();
+      }
       const q = vocabQs[idx];
+      // Direction: TOEIC shows English → pick meaning (receptive);
+      // Conversation shows Vietnamese → pick the English word (productive).
+      const vi2en = track.vocabDirection === 'vi2en';
       container.innerHTML = `
         <section class="view game-view iv-view">
           ${hud('📚 ' + t('pl.vocab'), idx + 1, vocabQs.length)}
-          <div class="quiz-question"><div>${esc(q.word.en)}</div><div class="sub">${t('pl.pickMeaning')}</div></div>
+          <div class="quiz-question"><div>${esc(vi2en ? q.word.vi : q.word.en)}</div><div class="sub">${vi2en ? t('pl.pickWord') : t('pl.pickMeaning')}</div></div>
           <div class="quiz-options">
-            ${q.options.map((o) => `<button class="quiz-option" type="button" data-en="${esc(o.en)}">${esc(o.vi)}</button>`).join('')}
+            ${q.options.map((o) => `<button class="quiz-option" type="button" data-en="${esc(o.en)}">${esc(vi2en ? o.en : o.vi)}</button>`).join('')}
           </div>
         </section>`;
       bindExit();
@@ -342,8 +360,33 @@
       });
     }
 
+    function renderDialogue() {
+      if (idx >= dialogueQs.length) { stage = 'speaking'; idx = 0; return renderSpeaking(); }
+      const d = dialogueQs[idx];
+      container.innerHTML = `
+        <section class="view game-view iv-view">
+          ${hud('💬 ' + t('pl.dialogue'), idx + 1, dialogueQs.length)}
+          <div class="quiz-question" style="font-size:19px;">
+            <div class="muted-note" style="margin-bottom:6px;">A:</div>
+            <div>“${esc(d.a)}” <button class="speak-btn" type="button" data-speak="${esc(d.a)}">🔊</button></div>
+            <div class="sub">${t('pl.pickReply')}</div>
+          </div>
+          <div class="quiz-options">
+            ${d.choices.map((c, i) => `<button class="quiz-option" type="button" data-i="${i}">B: ${esc(c)}</button>`).join('')}
+          </div>
+        </section>`;
+      bindExit();
+      if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(container);
+      container.querySelectorAll('.quiz-option').forEach((b) => {
+        b.addEventListener('click', () => {
+          answers.dialogue.push({ id: d.id, tier: d.tier, correct: Number(b.getAttribute('data-i')) === d.answer, g: { q: 'A: ' + d.a, choices: d.choices, answer: d.answer, explain: d.explain } });
+          idx += 1; renderDialogue();
+        });
+      });
+    }
+
     function renderGrammar() {
-      if (idx >= grammarQs.length) { stage = 'speaking'; return renderSpeaking(); }
+      if (idx >= grammarQs.length) { stage = 'speaking'; idx = 0; return renderSpeaking(); }
       const g = grammarQs[idx];
       container.innerHTML = `
         <section class="view game-view iv-view">
@@ -437,15 +480,17 @@
 
     function finish() {
       const vocabPct = pct(answers.vocab);
-      const grammarPct = pct(answers.grammar);
+      // "Second section" = grammar (TOEIC) or dialogue reflex (Conversation).
+      const secondList = track.dialogues ? answers.dialogue : answers.grammar;
+      const grammarPct = pct(secondList);
       const tierPct = (list, tier) => pct(list.filter((a) => a.tier === tier));
       const spoken = answers.speaking.filter((s) => typeof s.score === 'number');
       const speakingPct = spoken.length
         ? Math.round(spoken.reduce((a, s) => a + s.score, 0) / spoken.length * 10) : null;
       // Track weights; if speaking was skipped its weight is redistributed.
       const w = Object.assign({}, track.weights);
-      if (speakingPct == null) { const rest = w.vocab + w.grammar; w.vocab = w.vocab / rest; w.grammar = w.grammar / rest; w.speaking = 0; }
-      const composite = Math.round(vocabPct * w.vocab + grammarPct * w.grammar + (speakingPct || 0) * w.speaking);
+      if (speakingPct == null) { const rest = w.vocab + w.second; w.vocab = w.vocab / rest; w.second = w.second / rest; w.speaking = 0; }
+      const composite = Math.round(vocabPct * w.vocab + grammarPct * w.second + (speakingPct || 0) * w.speaking);
       const level = levelFor(composite);
 
       const placement = {
@@ -453,8 +498,9 @@
         vocabPct, grammarPct, speakingPct,
         tiers: {
           vocab: { easy: tierPct(answers.vocab, 'easy'), medium: tierPct(answers.vocab, 'medium'), hard: tierPct(answers.vocab, 'hard') },
-          grammar: { easy: tierPct(answers.grammar, 'easy'), medium: tierPct(answers.grammar, 'medium'), hard: tierPct(answers.grammar, 'hard') },
+          grammar: { easy: tierPct(secondList, 'easy'), medium: tierPct(secondList, 'medium'), hard: tierPct(secondList, 'hard') },
         },
+        secondLabel: track.secondLabel,
       };
       const p = Storage.getProgress();
       p.placements = p.placements || {};
@@ -466,7 +512,9 @@
     }
 
     function renderResult(pl, level) {
-      const wrong = answers.grammar.filter((a) => !a.correct);
+      const secondList = track.dialogues ? answers.dialogue : answers.grammar;
+      const wrong = secondList.filter((a) => !a.correct);
+      const secondLabel = (track.secondLabel && track.secondLabel[L]) || t('pl.grammar');
       container.innerHTML = `
         <section class="view iv-view">
           <div class="game-result">
@@ -479,10 +527,10 @@
             </div>
             <div class="stats">
               <div class="stat"><div class="v">${pl.vocabPct}%</div><div class="l">${t('pl.vocab')}</div></div>
-              <div class="stat"><div class="v">${pl.grammarPct}%</div><div class="l">${t('pl.grammar')}</div></div>
+              <div class="stat"><div class="v">${pl.grammarPct}%</div><div class="l">${esc(secondLabel)}</div></div>
               <div class="stat"><div class="v">${pl.speakingPct == null ? '—' : pl.speakingPct + '%'}</div><div class="l">${t('pl.speaking')}</div></div>
             </div>
-            ${wrong.length ? `<details class="iv-details" style="max-width:640px;margin:14px auto;"><summary>✏️ ${t('pl.reviewGrammar')} (${wrong.length})</summary>
+            ${wrong.length ? `<details class="iv-details" style="max-width:640px;margin:14px auto;"><summary>✏️ ${track.dialogues ? t('pl.reviewDialogue') : t('pl.reviewGrammar')} (${wrong.length})</summary>
               ${wrong.map((a) => `<p><strong>${esc(a.g.q)}</strong><br/>✅ ${esc(a.g.choices[a.g.answer])} — <span class="muted-note" style="display:inline;">${esc(a.g.explain)}</span></p>`).join('')}
             </details>` : ''}
             <p style="max-width:560px;margin:10px auto;color:var(--text-muted);">${t('pl.roadmapMade')}</p>
