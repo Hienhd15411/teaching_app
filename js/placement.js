@@ -33,11 +33,14 @@
     return cur;
   }
 
-  function generateRoadmap(levelId) {
-    const tpl = PLACEMENT_BANK.ROADMAPS[levelId] || PLACEMENT_BANK.ROADMAPS.B1;
+  function generateRoadmap(levelId, track) {
+    const tr = track || 'toeic';
+    const byTrack = PLACEMENT_BANK.ROADMAPS[tr] || PLACEMENT_BANK.ROADMAPS.toeic;
+    const tpl = byTrack[levelId] || byTrack.B1;
     return {
       createdAt: Date.now(),
       level: levelId,
+      track: tr,
       weeks: tpl.map((w, wi) => ({
         title: w.title,
         items: w.items.map((it, ii) => ({ id: 'w' + (wi + 1) + 'i' + (ii + 1), type: it.type, target: it.target })),
@@ -228,10 +231,9 @@
 
   // ---------- the test flow ----------
 
-  function buildVocabQuestions(n) {
+  function buildVocabQuestions(perTier) {
     const V = global.VOCAB || {};
     const tiers = PLACEMENT_BANK.VOCAB_TIERS;
-    const perTier = { easy: 7, medium: 7, hard: 6 };
     const out = [];
     Object.keys(perTier).forEach((tier) => {
       const pool = [];
@@ -242,22 +244,25 @@
         out.push({ tier, word: w, options: shuffle([w].concat(others)) });
       });
     });
-    return shuffle(out).slice(0, n);
+    return shuffle(out);
   }
 
-  function buildGrammarQuestions(n) {
+  function buildGrammarQuestions(counts) {
     const G = PLACEMENT_BANK.GRAMMAR;
     const by = (tier) => shuffle(G.filter((g) => g.tier === tier));
-    return shuffle([].concat(by('easy').slice(0, 4), by('medium').slice(0, 3), by('hard').slice(0, 3))).slice(0, n);
+    return shuffle([].concat(by('easy').slice(0, counts.easy || 0), by('medium').slice(0, counts.medium || 0), by('hard').slice(0, counts.hard || 0)));
   }
 
   function start(opts) {
     const { container, onDone, onExit } = opts;
     const t = I18N.t;
     const lang = I18N.getLang();
-    const vocabQs = buildVocabQuestions(20);
-    const grammarQs = buildGrammarQuestions(10);
-    const answers = { vocab: [], grammar: [], speaking: null };
+    const L = lang === 'en' ? 'en' : 'vi';
+    let track = null;        // PLACEMENT_BANK.TRACKS entry
+    let vocabQs = [];
+    let grammarQs = [];
+    let prompts = [];
+    const answers = { vocab: [], grammar: [], speaking: [] };
     let stage = 'intro';
     let idx = 0;
     let recognition = null;
@@ -279,25 +284,42 @@
     }
 
     function renderIntro() {
+      const TR = PLACEMENT_BANK.TRACKS;
       container.innerHTML = `
         <section class="view iv-view">
           <div class="pl-intro">
             <div class="big">🎯</div>
             <h1>${t('pl.title')}</h1>
-            <p>${t('pl.intro')}</p>
-            <ul class="pl-steps">
-              <li>📚 ${t('pl.stepVocab')}</li>
-              <li>✏️ ${t('pl.stepGrammar')}</li>
-              <li>🎤 ${t('pl.stepSpeaking')}</li>
-            </ul>
+            <p>${t('pl.chooseTrack')}</p>
+            <div class="iv-airline-grid" style="text-align:left;">
+              ${Object.values(TR).map((tr) => `
+                <button class="iv-airline-card" type="button" data-track="${tr.id}">
+                  <div class="iv-airline-icon" style="font-size:40px;">${tr.icon}</div>
+                  <div class="iv-airline-name">${esc(tr.label[L])}</div>
+                  <div class="iv-airline-tag">${esc(tr.desc[L])}</div>
+                </button>`).join('')}
+            </div>
             <div class="btn-row" style="justify-content:center;margin-top:18px;">
-              <button class="btn" type="button" id="plStart">${t('pl.start')} →</button>
               <button class="btn secondary" type="button" id="plExit">${t('game.back')}</button>
             </div>
           </div>
         </section>`;
       bindExit();
-      container.querySelector('#plStart').addEventListener('click', () => { stage = 'vocab'; idx = 0; renderVocab(); });
+      container.querySelectorAll('[data-track]').forEach((b) => b.addEventListener('click', () => beginTrack(b.getAttribute('data-track'))));
+    }
+
+    function beginTrack(id) {
+      track = PLACEMENT_BANK.TRACKS[id] || PLACEMENT_BANK.TRACKS.toeic;
+      vocabQs = buildVocabQuestions(track.vocabTiers);
+      grammarQs = buildGrammarQuestions(track.grammar);
+      prompts = PLACEMENT_BANK.SPEAKING_PROMPTS.slice(0, track.speaking || 0);
+      answers.vocab = []; answers.grammar = []; answers.speaking = [];
+      stage = 'vocab'; idx = 0;
+      renderVocab();
+    }
+    if (opts.track && PLACEMENT_BANK.TRACKS[opts.track]) {
+      // Deep link straight into a track (e.g. "test this track" button).
+      setTimeout(() => beginTrack(opts.track), 0);
     }
 
     function renderVocab() {
@@ -347,12 +369,16 @@
     }
 
     function renderSpeaking() {
+      if (!prompts.length || idx >= prompts.length) return finish();
+      const pr = prompts[idx];
+      confs = [];
       container.innerHTML = `
         <section class="view game-view iv-view">
-          ${hud('🎤 ' + t('pl.speaking'), 1, 1)}
+          ${hud('🎤 ' + t('pl.speaking'), idx + 1, prompts.length)}
           <div class="iv-question-card">
-            <div class="iv-question">Tell me about yourself in about 30 seconds.</div>
-            <div class="iv-question-vi">${t('pl.speakingHint')}</div>
+            <div class="iv-question">${esc(pr.q)}
+              <button class="speak-btn big" type="button" data-speak="${esc(pr.q)}">🔊</button></div>
+            <div class="iv-question-vi">${esc(pr.qVi)}</div>
           </div>
           <div class="iv-answer-zone">
             ${SR ? `<div class="mic-stage"><button class="mic-btn" type="button" id="plMic"><span class="mic-icon">🎤</span><span id="plMicLabel">${t('iv.tapToAnswer')}</span></button></div>` : ''}
@@ -364,6 +390,7 @@
           </div>
         </section>`;
       bindExit();
+      if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(container);
       const ta = container.querySelector('#plText');
       if (SR) {
         container.querySelector('#plMic').addEventListener('click', () => {
@@ -394,17 +421,16 @@
       container.querySelector('#plSubmit').addEventListener('click', () => {
         stopAsr();
         const text = ta.value.trim();
-        if (!text) { answers.speaking = null; return finish(); }
         let score = null;
-        if (global.InterviewGame && global.INTERVIEW_BANK) {
-          const q = INTERVIEW_BANK.questions.find((x) => x.id === 'self_intro');
+        if (text && global.InterviewGame && global.INTERVIEW_BANK) {
+          const q = INTERVIEW_BANK.questions.find((x) => x.id === pr.bankId) || INTERVIEW_BANK.questions[0];
           const conf = confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : null;
           score = InterviewGame.scoreAnswer(q, text, conf).total; // 0-10
         }
-        answers.speaking = { text, score };
-        finish();
+        answers.speaking.push({ id: pr.id, text, score });
+        idx += 1; renderSpeaking();
       });
-      container.querySelector('#plSkip').addEventListener('click', () => { stopAsr(); answers.speaking = null; finish(); });
+      container.querySelector('#plSkip').addEventListener('click', () => { stopAsr(); answers.speaking.push({ id: pr.id, text: '', score: null }); idx += 1; renderSpeaking(); });
     }
 
     function pct(list) { return list.length ? Math.round(list.filter((a) => a.correct).length / list.length * 100) : 0; }
@@ -413,15 +439,17 @@
       const vocabPct = pct(answers.vocab);
       const grammarPct = pct(answers.grammar);
       const tierPct = (list, tier) => pct(list.filter((a) => a.tier === tier));
-      const speakingPct = answers.speaking && typeof answers.speaking.score === 'number'
-        ? Math.round(answers.speaking.score * 10) : null;
-      const composite = speakingPct == null
-        ? Math.round((vocabPct * 0.5 + grammarPct * 0.5))
-        : Math.round(vocabPct * 0.4 + grammarPct * 0.4 + speakingPct * 0.2);
+      const spoken = answers.speaking.filter((s) => typeof s.score === 'number');
+      const speakingPct = spoken.length
+        ? Math.round(spoken.reduce((a, s) => a + s.score, 0) / spoken.length * 10) : null;
+      // Track weights; if speaking was skipped its weight is redistributed.
+      const w = Object.assign({}, track.weights);
+      if (speakingPct == null) { const rest = w.vocab + w.grammar; w.vocab = w.vocab / rest; w.grammar = w.grammar / rest; w.speaking = 0; }
+      const composite = Math.round(vocabPct * w.vocab + grammarPct * w.grammar + (speakingPct || 0) * w.speaking);
       const level = levelFor(composite);
 
       const placement = {
-        takenAt: Date.now(), score: composite, level: level.id, toeic: level.toeic,
+        track: track.id, takenAt: Date.now(), score: composite, level: level.id, toeic: level.toeic,
         vocabPct, grammarPct, speakingPct,
         tiers: {
           vocab: { easy: tierPct(answers.vocab, 'easy'), medium: tierPct(answers.vocab, 'medium'), hard: tierPct(answers.vocab, 'hard') },
@@ -429,24 +457,25 @@
         },
       };
       const p = Storage.getProgress();
-      p.placement = placement;
-      p.roadmap = generateRoadmap(level.id);
+      p.placements = p.placements || {};
+      p.placements[track.id] = placement;
+      p.placement = placement;                       // latest, for teacher chip / back-compat
+      p.roadmap = generateRoadmap(level.id, track.id);
       Storage.saveProgress(p);
       renderResult(placement, level);
     }
 
     function renderResult(pl, level) {
-      const L = lang === 'en' ? 'en' : 'vi';
       const wrong = answers.grammar.filter((a) => !a.correct);
       container.innerHTML = `
         <section class="view iv-view">
           <div class="game-result">
             <div class="big">${level.icon}</div>
-            <h2>${t('pl.resultTitle')}</h2>
+            <h2>${track.icon} ${esc(track.label[L])} — ${t('pl.resultTitle')}</h2>
             <div class="grade-card grade-good" style="max-width:340px;">
               <div class="grade-label">${t('pl.yourLevel')}</div>
               <div class="grade-score" style="font-size:38px;">${esc(level.label[L])}</div>
-              <div class="grade-rank">TOEIC ≈ ${esc(level.toeic)}</div>
+              <div class="grade-rank">${track.id === 'toeic' ? 'TOEIC ≈ ' + esc(level.toeic) : t('pl.convLevelHint')}</div>
             </div>
             <div class="stats">
               <div class="stat"><div class="v">${pl.vocabPct}%</div><div class="l">${t('pl.vocab')}</div></div>

@@ -96,11 +96,15 @@
     // story in a demo (B1 level, roadmap partly done, Tue/Thu/Sat 20:00).
     if (typeof global.Placement !== 'undefined' && typeof global.PLACEMENT_BANK !== 'undefined') {
       p.placement = {
-        takenAt: now - 12 * day, score: 58, level: 'B1', toeic: '500 – 700',
-        vocabPct: 65, grammarPct: 50, speakingPct: 62,
+        track: 'toeic', takenAt: now - 12 * day, score: 58, level: 'B1', toeic: '500 – 700',
+        vocabPct: 65, grammarPct: 50, speakingPct: null,
         tiers: { vocab: { easy: 86, medium: 57, hard: 33 }, grammar: { easy: 75, medium: 33, hard: 33 } },
       };
-      p.roadmap = global.Placement.generateRoadmap('B1');
+      p.placements = {
+        toeic: p.placement,
+        conversation: { track: 'conversation', takenAt: now - 10 * day, score: 66, level: 'B1', toeic: '500 – 700', vocabPct: 72, grammarPct: 60, speakingPct: 64 },
+      };
+      p.roadmap = global.Placement.generateRoadmap('B1', 'toeic');
       p.roadmap.createdAt = now - 12 * day;
       p.roadmap.manual = { w1i4: true };
       p.schedule = { days: ['tue', 'thu', 'sat'], time: '20:00', minutes: 20, remind: true, updatedAt: now - 12 * day };

@@ -55,7 +55,7 @@
         InterviewGame.start({ container: appEl, onExit: () => navigate('topics'), sections: params && params.sections });
         break;
       case 'placement':
-        Placement.start({ container: appEl, onDone: () => navigate('progress'), onExit: () => navigate('progress') });
+        Placement.start({ container: appEl, onDone: () => navigate('progress'), onExit: () => navigate('progress'), track: params && params.track });
         break;
       case 'drill':
         PronDrill.start({ container: appEl, onExit: () => navigate('progress'), setId: params && params.setId });
@@ -174,6 +174,8 @@
         navigate('topic', { topicId: el.getAttribute('data-topic') });
       });
     });
+    // Placement CTA on the Topics tab (was rendered but never wired).
+    appEl.querySelectorAll('#plGo').forEach((b) => b.addEventListener('click', () => navigate('placement')));
   }
 
   // ========== Topic detail (mode picker + word list) ==========
@@ -697,7 +699,23 @@
     const t = I18N.t;
     if (typeof Placement === 'undefined') return '';
     const L = lang === 'en' ? 'en' : 'vi';
-    if (!progress.placement || !progress.roadmap) {
+    const TR = PLACEMENT_BANK.TRACKS;
+    const pls = progress.placements || (progress.placement ? { [progress.placement.track || 'toeic']: progress.placement } : {});
+    // Track strip: per track either the level (switch roadmap) or a "test" button.
+    const trackStrip = `
+      <div class="btn-row" style="margin-bottom:10px;">
+        ${Object.values(TR).map((tr) => {
+          const pl = pls[tr.id];
+          const active = progress.roadmap && progress.roadmap.track === tr.id;
+          if (pl) {
+            const lvl = PLACEMENT_BANK.LEVELS.find((x) => x.id === pl.level) || PLACEMENT_BANK.LEVELS[1];
+            return `<button class="voice-pill ${active ? 'active' : ''}" type="button" data-switch-track="${tr.id}" title="${t('pl.switchTrack')}">${tr.icon} ${escapeHtml(tr.label[L])} · ${lvl.id}</button>`;
+          }
+          return `<button class="voice-pill" type="button" data-test-track="${tr.id}">${tr.icon} ${escapeHtml(tr.label[L])} · ${t('pl.trackNotTested')}</button>`;
+        }).join('')}
+      </div>`;
+
+    if (!progress.roadmap || !Object.keys(pls).length) {
       return `
         <div class="plan-card plan-cta">
           <div class="plan-cta-icon">🎯</div>
@@ -708,8 +726,10 @@
           <button class="btn" type="button" id="plGo">${t('pl.ctaBtn')} →</button>
         </div>`;
     }
-    const pl = progress.placement;
-    const lvl = (PLACEMENT_BANK.LEVELS.find((x) => x.id === pl.level) || PLACEMENT_BANK.LEVELS[1]);
+    const rmTrack = progress.roadmap.track || 'toeic';
+    const pl = pls[rmTrack] || progress.placement;
+    const lvl = (PLACEMENT_BANK.LEVELS.find((x) => x.id === (pl ? pl.level : progress.roadmap.level)) || PLACEMENT_BANK.LEVELS[1]);
+    const trDef = TR[rmTrack] || TR.toeic;
     const st = Placement.roadmapStatus(progress);
     const weeks = st.weeks.map((w, wi) => `
       <div class="plan-week">
@@ -727,15 +747,16 @@
       </div>`).join('');
     return `
       <div class="plan-card">
+        ${trackStrip}
         <div class="plan-head">
           <div>
-            <div class="plan-title">${lvl.icon} ${t('pl.yourLevel')}: <strong>${escapeHtml(lvl.label[L])}</strong>
-              <span class="muted-note" style="display:inline;">· TOEIC ≈ ${escapeHtml(pl.toeic)}</span></div>
+            <div class="plan-title">${trDef.icon} ${escapeHtml(trDef.label[L])} · ${lvl.icon} <strong>${escapeHtml(lvl.label[L])}</strong>
+              ${rmTrack === 'toeic' && pl ? `<span class="muted-note" style="display:inline;">· TOEIC ≈ ${escapeHtml(pl.toeic)}</span>` : ''}</div>
             <div class="muted-note">${t('pl.roadmapTitle')} · ${st.done}/${st.total} ${t('pl.itemsDone')}</div>
           </div>
           <div class="btn-row">
             <span class="mini-bar" style="width:120px;"><span style="width:${st.pct}%"></span></span>
-            <button class="btn secondary" type="button" id="plRetake">🔁 ${t('pl.retake')}</button>
+            <button class="btn secondary" type="button" id="plRetake" data-track="${rmTrack}">🔁 ${t('pl.retake')}</button>
           </div>
         </div>
         <div class="plan-weeks">${weeks}</div>
@@ -834,7 +855,18 @@
     if (typeof Placement === 'undefined') return;
     appEl.querySelectorAll('#plGo').forEach((b) => b.addEventListener('click', () => navigate('placement')));
     const retake = appEl.querySelector('#plRetake');
-    if (retake) retake.addEventListener('click', () => { if (confirm(t('pl.retakeConfirm'))) navigate('placement'); });
+    if (retake) retake.addEventListener('click', () => { if (confirm(t('pl.retakeConfirm'))) navigate('placement', { track: retake.getAttribute('data-track') }); });
+    appEl.querySelectorAll('[data-test-track]').forEach((b) => b.addEventListener('click', () => navigate('placement', { track: b.getAttribute('data-test-track') })));
+    appEl.querySelectorAll('[data-switch-track]').forEach((b) => b.addEventListener('click', () => {
+      const tr = b.getAttribute('data-switch-track');
+      const p = Storage.getProgress();
+      const pl = p.placements && p.placements[tr];
+      if (!pl) return;
+      if (p.roadmap && p.roadmap.track === tr) return;
+      p.roadmap = Placement.generateRoadmap(pl.level, tr);
+      Storage.saveProgress(p);
+      navigate('progress', null, { fromPop: true });
+    }));
     appEl.querySelectorAll('[data-tick]').forEach((b) => b.addEventListener('click', () => {
       Placement.toggleManual(b.getAttribute('data-tick'));
       navigate('progress', null, { fromPop: true });
@@ -1764,6 +1796,12 @@
     // ticks from both sides when it's the same roadmap).
     const newer = (x, y, key) => ((y && y[key]) || 0) > ((x && x[key]) || 0) ? y : x;
     out.placement = newer(a.placement, b.placement, 'takenAt') || undefined;
+    // Per-track placements: newest per track.
+    const pk = new Set([].concat(Object.keys(a.placements || {}), Object.keys(b.placements || {})));
+    if (pk.size) {
+      out.placements = {};
+      pk.forEach((k) => { out.placements[k] = newer((a.placements || {})[k], (b.placements || {})[k], 'takenAt'); });
+    }
     const rm = newer(a.roadmap, b.roadmap, 'createdAt');
     if (rm) {
       out.roadmap = JSON.parse(JSON.stringify(rm));
