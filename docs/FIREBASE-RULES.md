@@ -12,6 +12,9 @@ Access summary:
 - `/groups`, `/billing_settings` — teachers only.
 - `/feature_flags/{uid}` — student reads own (gates the ✈️ Interview nav);
   only teachers write (toggle in the student detail modal).
+- `/merges/{keepUid}/{oldUid}` — duplicate-account merges. Teachers write
+  (Lớp học → "Có thể trùng tài khoản" → Giữ tài khoản này); the student reads
+  own so the app can fold the old account's progress into the kept one.
 
 ```json
 {
@@ -39,6 +42,13 @@ Access summary:
       ".write": "auth != null && root.child('teachers').child(auth.uid).val() == true"
     },
     "feature_flags": {
+      ".read": "auth != null && root.child('teachers').child(auth.uid).val() == true",
+      ".write": "auth != null && root.child('teachers').child(auth.uid).val() == true",
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('teachers').child(auth.uid).val() == true)"
+      }
+    },
+    "merges": {
       ".read": "auth != null && root.child('teachers').child(auth.uid).val() == true",
       ".write": "auth != null && root.child('teachers').child(auth.uid).val() == true",
       "$uid": {

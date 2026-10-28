@@ -202,6 +202,7 @@
         <div style="color:var(--text-muted);font-size:13px;">
           ${stats.mastered}/${stats.total} ${t('topics.mastered')} · ${stats.masteryPct}%
         </div>
+        ${renderLearnSummary(progress, topicId, words)}
 
         <h2 style="margin-top:24px;">${t('topic.chooseMode')}</h2>
         <div class="mode-grid">
@@ -235,6 +236,7 @@
         ${reviewBtn}
 
         <h2 style="margin-top:24px;">${t('topic.allWords')}</h2>
+        ${renderWordFilter()}
         <div class="word-list" id="wordList"></div>
       </section>
     `;
@@ -252,24 +254,47 @@
     }
 
     const wordListEl = appEl.querySelector('#wordList');
-    words.forEach((w) => {
-      const state = SRS.getWordState(progress, topicId, w.en);
-      const row = document.createElement('div');
-      row.className = 'word-row';
-      const ipaHtml = w.ipa ? `<span class="ipa">${escapeHtml(w.ipa)}</span>` : '';
-      row.innerHTML = `
-        <div class="en">
-          <button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${t('word.listen')}">🔊</button>
-          <span class="w">${escapeHtml(w.en)}</span>
-          ${w.pos ? `<span style="color:var(--text-muted);font-weight:400;font-size:12px;">(${w.pos})</span>` : ''}
-          ${ipaHtml}
-        </div>
-        <div class="vi">${escapeHtml(w.vi)}</div>
-        <span class="mastery-dot box-${state.box}" title="Box ${state.box}/5"></span>
-      `;
-      wordListEl.appendChild(row);
-    });
+    wordListEl.innerHTML = words.map((w) => renderWordRow(w, topicId, progress)).join('');
+    wireWordFilter(appEl);
     if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(wordListEl);
+  }
+
+  // "Đã học x/N · Chưa học y · Cần ôn z" + what each mode picks.
+  function renderLearnSummary(progress, topicId, words) {
+    const t = I18N.t;
+    const ls = SRS.learnStatus(progress, topicId, words);
+    return `
+      <div class="learn-summary">
+        <span class="ls-chip learned">✅ ${t('learn.learned')} <strong>${ls.learned}/${ls.total}</strong></span>
+        <span class="ls-chip new">🆕 ${t('learn.unseen')} <strong>${ls.unseen}</strong></span>
+        <span class="ls-chip due">🔁 ${t('learn.due')} <strong>${ls.due}</strong></span>
+      </div>
+      <div class="muted-note learn-hint">${t('learn.modeHint')}</div>`;
+  }
+
+  function renderWordFilter() {
+    const t = I18N.t;
+    return `
+      <div class="btn-row word-filter">
+        ${['all', 'new', 'learned', 'due'].map((k) =>
+          `<button type="button" class="voice-pill ${k === 'all' ? 'active' : ''}" data-wf="${k}">${t('learn.filter.' + k)}</button>`).join('')}
+      </div>`;
+  }
+
+  function wireWordFilter(root) {
+    const btns = root.querySelectorAll('[data-wf]');
+    btns.forEach((b) => b.addEventListener('click', () => {
+      const f = b.getAttribute('data-wf');
+      btns.forEach((x) => x.classList.toggle('active', x === b));
+      root.querySelectorAll('.word-row[data-status]').forEach((row) => {
+        const st = row.getAttribute('data-status');
+        const show = f === 'all'
+          || (f === 'new' && st === 'new')
+          || (f === 'learned' && st !== 'new')
+          || (f === 'due' && st === 'due');
+        row.style.display = show ? '' : 'none';
+      });
+    }));
   }
 
   // ========== Game runner ==========
@@ -283,9 +308,7 @@
     if (!words.length) return exitTarget();
 
     const progress = Storage.getProgress();
-    const sessionWords = wordsOverride
-      ? SRS.pickSession(progress, topicId, words.slice(), Math.min(10, words.length))
-      : SRS.pickSession(progress, topicId, words, Math.min(10, words.length));
+    const sessionWords = SRS.pickSession(progress, topicId, words.slice(), Math.min(10, words.length), mode);
 
     const game = getGameModule(mode);
     if (!game) return exitTarget();
@@ -1042,6 +1065,7 @@
         <div style="color:var(--text-muted);font-size:13px;">
           ${stats.mastered}/${stats.total} ${t('topics.mastered')} · ${stats.masteryPct}%
         </div>
+        ${renderLearnSummary(progress, virtualTopicId, allWords)}
 
         <h2 style="margin-top:24px;">${t('topic.chooseMode')}</h2>
         <div class="mode-grid">
@@ -1067,11 +1091,13 @@
           </div>
         </div>
 
+        <div style="margin-top:20px;">${renderWordFilter()}</div>
         ${renderGroupList(keywords, '🎯 ' + t('toeic.group.keywords'))}
         ${renderGroupList(highFreq, '📊 ' + t('toeic.group.highFreq'))}
       </section>
     `;
 
+    wireWordFilter(appEl);
     appEl.querySelector('#backBtn').addEventListener('click', () => navigate('toeic'));
     appEl.querySelectorAll('.mode-card').forEach((el) => {
       el.addEventListener('click', () => {
@@ -1087,10 +1113,13 @@
   }
 
   function renderWordRow(w, topicId, progress) {
-    const state = SRS.getWordState(progress, topicId, w.en);
+    const rec = progress.perWord[SRS.wordKey(topicId, w.en)];
+    const box = rec ? rec.box : 0; // 0 = chưa học (hollow dot)
+    const status = SRS.wordStatus(progress, topicId, w.en);
+    const dotTitle = I18N.t('learn.status.' + status) + (rec ? ' · Box ' + box + '/5' : '');
     const ipaHtml = w.ipa ? `<span class="ipa">${escapeHtml(w.ipa)}</span>` : '';
     return `
-      <div class="word-row">
+      <div class="word-row" data-status="${status}">
         <div class="en">
           <button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>
           <span class="w">${escapeHtml(w.en)}</span>
@@ -1098,13 +1127,19 @@
           ${ipaHtml}
         </div>
         <div class="vi">${escapeHtml(w.vi)}</div>
-        <span class="mastery-dot box-${state.box}" title="Box ${state.box}/5"></span>
+        <span class="mastery-dot box-${box}" title="${escapeHtml(dotTitle)}"></span>
       </div>
     `;
   }
 
   // ========== Class (teacher) dashboard ==========
   let classTab = 'progress'; // survives tab re-renders within the session
+
+  // "⚠️ email sai?" when the domain looks mistyped → reset mail can't arrive.
+  function emailWarn(email) {
+    const fix = typeof Accounts !== 'undefined' ? Accounts.suggestEmail(email) : null;
+    return fix ? ` <span class="email-warn" title="${escapeHtml(I18N.t('acc.typoTitle').replace('{fix}', fix))}">⚠️ ${I18N.t('acc.typoShort')}</span>` : '';
+  }
 
   function renderClass() {
     const t = I18N.t;
@@ -1160,6 +1195,7 @@
       }
       const result = await FirebaseSync.listAllStudents();
       lastStudents = result.students || [];
+      lastMergedCount = result.mergedCount || 0;
       if (result.error === 'permission-denied') {
         content.className = 'empty-state';
         content.style.padding = '30px 20px';
@@ -1189,6 +1225,7 @@
     };
 
     let lastStudents = [];
+    let lastMergedCount = 0;
 
     const paintList = (students) => {
       const content = appEl.querySelector('#classContent');
@@ -1265,7 +1302,7 @@
         <tr class="clickable" data-student="${escapeHtml(r.s.id)}">
           <td>${idx + 1}</td>
           <td>${escapeHtml(r.s.profile.avatar || '🙂')} <strong>${escapeHtml(r.s.profile.name || r.s.id)}</strong>${r.createdMs > newCutoff ? ` <span class="new-badge">🆕</span>` : ''}</td>
-          <td class="muted">${escapeHtml(r.s.profile.email || '')}</td>
+          <td class="muted">${escapeHtml(r.s.profile.email || '')}${emailWarn(r.s.profile.email)}</td>
           <td class="num muted">${signupLabel(r.createdMs)}</td>
           <td class="num">${r.level}</td>
           <td class="num">${r.xp}</td>
@@ -1277,10 +1314,31 @@
         </tr>
       `).join('');
 
+      // Likely duplicate accounts (same person, different email).
+      const dupGroups = typeof Accounts !== 'undefined' ? Accounts.findDuplicates(students) : [];
+      const dupHtml = !dupGroups.length ? '' : `
+        <h3 style="margin:18px 0 6px;">⚠️ ${t('acc.dupTitle')} (${dupGroups.length})</h3>
+        <div class="muted-note" style="margin-bottom:10px;">${t('acc.dupSub')}</div>
+        ${dupGroups.map((g, gi) => `
+          <div class="dup-card">
+            <div class="dup-reason">${g.reasons.map((r) => t('acc.reason.' + r)).join(' · ')}</div>
+            ${g.members.map((s, mi) => {
+              const words = Object.keys((s.progress && s.progress.perWord) || {}).length;
+              return `
+              <div class="dup-acc">
+                <span>${escapeHtml(s.profile.avatar || '🙂')} <strong>${escapeHtml(s.profile.name || s.id)}</strong>
+                  <span class="muted">· ${escapeHtml(s.profile.email || '')}</span>${emailWarn(s.profile.email)}<br>
+                  <span class="muted">${t('acc.created')} ${signupLabel((s.profile && s.profile.createdAt) || 0)} · ${words} ${t('acc.words')} · ${t('acc.active')} ${lastActiveLabel(s.updatedAt || 0)}${mi === 0 ? ' · <strong>' + t('acc.mostRecent') + '</strong>' : ''}</span></span>
+                <button class="btn ${mi === 0 ? '' : 'secondary'}" type="button" data-keep="${gi}:${mi}">${t('acc.keepThis')}</button>
+              </div>`;
+            }).join('')}
+          </div>`).join('')}`;
+
       content.innerHTML = `
         <h3 style="margin:4px 0 10px;">${t('class.attention')}</h3>
         ${attnHtml}
-        <div style="color:var(--text-muted);font-size:13px;margin:18px 0 10px;">${students.length} ${t('class.totalStudents')} · ${t('class.clickRow')}</div>
+        ${dupHtml}
+        <div style="color:var(--text-muted);font-size:13px;margin:18px 0 10px;">${students.length} ${t('class.totalStudents')}${lastMergedCount ? ' · ' + t('acc.mergedHidden').replace('{n}', lastMergedCount) : ''} · ${t('class.clickRow')}</div>
         <table class="progress-table">
           <thead>
             <tr>
@@ -1307,6 +1365,31 @@
       };
       content.querySelectorAll('[data-student]').forEach((el) => {
         el.addEventListener('click', () => openById(el.getAttribute('data-student')));
+      });
+      content.querySelectorAll('[data-keep]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (isDemoView()) { toast(t('acc.demoBlocked')); return; }
+          const [gi, mi] = btn.getAttribute('data-keep').split(':').map(Number);
+          const g = dupGroups[gi];
+          const keep = g.members[mi];
+          const others = g.members.filter((_, i) => i !== mi);
+          const msg = t('acc.confirmMerge')
+            .replace('{n}', others.length)
+            .replace('{name}', keep.profile.name || keep.id)
+            .replace('{email}', keep.profile.email || '')
+            .replace('{others}', others.map((o) => o.profile.email || o.id).join(', '));
+          if (!confirm(msg)) return;
+          btn.disabled = true;
+          try {
+            for (const o of others) await Accounts.mergeInto(keep, o);
+            toast('✅ ' + t('acc.mergeDone'));
+            loadList();
+          } catch (e) {
+            btn.disabled = false;
+            const code = (e && (e.code || e.message)) || '';
+            toast(/permission/i.test(code) ? '🔒 ' + t('acc.rulesMissing') : '❌ ' + code);
+          }
+        });
       });
     };
 
@@ -1459,7 +1542,8 @@
           <h2>${escapeHtml(s.profile.avatar || '🙂')} ${escapeHtml(s.profile.name || s.id)}</h2>
           <button class="icon-btn" id="closeDetail" title="Close">✕</button>
         </div>
-        <p class="modal-sub">${escapeHtml(s.profile.email || '')}</p>
+        <p class="modal-sub">${escapeHtml(s.profile.email || '')}${emailWarn(s.profile.email)}
+          ${s.profile.email ? `<button class="btn-link" type="button" id="sendResetBtn" style="margin-left:8px;">📧 ${t('acc.sendReset')}</button>` : ''}</p>
         <div class="btn-row" style="margin-bottom:14px;">
           ${chip(t('class.level'), level)}
           ${chip('XP', xp)}
@@ -1487,6 +1571,22 @@
     const close = () => backdrop.remove();
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
     backdrop.querySelector('#closeDetail').addEventListener('click', close);
+    // Teacher re-sends the reset link (same Firebase mail the student gets).
+    const resetBtn = backdrop.querySelector('#sendResetBtn');
+    if (resetBtn) resetBtn.addEventListener('click', async () => {
+      const u = FirebaseSync.getCurrentUser();
+      if (typeof DemoSeed !== 'undefined' && DemoSeed.isDemoUser(u) && !FirebaseSync.isTeacher(u)) { toast(t('acc.demoBlocked')); return; }
+      const fix = typeof Accounts !== 'undefined' ? Accounts.suggestEmail(s.profile.email) : null;
+      if (fix && !confirm(t('acc.typoResetConfirm').replace('{fix}', fix))) return;
+      resetBtn.disabled = true;
+      try {
+        await FirebaseSync.sendPasswordReset(s.profile.email);
+        toast('📧 ' + t('acc.resetSentTeacher').replace('{email}', s.profile.email));
+      } catch (e) {
+        resetBtn.disabled = false;
+        toast('❌ ' + ((e && (e.code || e.message)) || 'error'));
+      }
+    });
 
     // Interview feature-flag toggle — real teacher accounts only, and not
     // for the fabricated demo roster (writes would pollute the DB).
@@ -1805,7 +1905,36 @@
         FirebaseSync.scheduleProgressPush();
       }
     }
+    await applyAccountMerges(user);
     renderHeader();
+  }
+
+  // The teacher merged an old (duplicate) account into this one: fold its
+  // progress in once. `mergedFrom` lives inside progress so it syncs and a
+  // second device never applies the same merge twice.
+  async function applyAccountMerges(user) {
+    if (!FirebaseSync.pullMerges) return;
+    const merges = await FirebaseSync.pullMerges();
+    if (!merges) return;
+    let p = Storage.getProgress(user.uid);
+    let changed = false;
+    Object.keys(merges).forEach((fromUid) => {
+      const m = merges[fromUid];
+      if (!m || !m.at) return;
+      if (((p.mergedFrom || {})[fromUid] || 0) >= m.at) return;
+      const other = Storage.normalizeProgress(m.progress ? JSON.parse(JSON.stringify(m.progress)) : null);
+      const xp = (p.xp || 0) + (other.xp || 0); // two separate accounts → add up
+      const merged = mergeProgress(p, other);
+      merged.xp = xp;
+      merged.level = Progress.computeLevel(xp).level;
+      merged.mergedFrom = Object.assign({}, p.mergedFrom || {}, { [fromUid]: m.at });
+      p = merged;
+      changed = true;
+    });
+    if (!changed) return;
+    Storage.saveProgress(p, user.uid); // also schedules the cloud push
+    toast('🔗 ' + I18N.t('acc.mergedToast'));
+    if (currentView === 'topics' || currentView === 'progress') navigate(currentView, null, { fromPop: true });
   }
 
   function mergeProgress(a, b) {
@@ -1835,6 +1964,10 @@
     out.schedule = newer(a.schedule, b.schedule, 'updatedAt') || undefined;
     if (out.placement === undefined) delete out.placement;
     if (out.schedule === undefined) delete out.schedule;
+    // Account merges already applied (uid → merge timestamp), max per key.
+    const mf = Object.assign({}, a.mergedFrom || {});
+    Object.keys(b.mergedFrom || {}).forEach((k) => { mf[k] = Math.max(mf[k] || 0, b.mergedFrom[k] || 0); });
+    if (Object.keys(mf).length) out.mergedFrom = mf;
 
     const wordKeys = new Set([].concat(Object.keys(a.perWord || {}), Object.keys(b.perWord || {})));
     wordKeys.forEach((k) => {
@@ -1861,6 +1994,7 @@
         correct: Math.max(ta.correct || 0, tb.correct || 0),
         wrong: Math.max(ta.wrong || 0, tb.wrong || 0),
         lastPlayedAt: Math.max(ta.lastPlayedAt || 0, tb.lastPlayedAt || 0),
+        lastTestedAt: Math.max(ta.lastTestedAt || 0, tb.lastTestedAt || 0),
       };
     });
 

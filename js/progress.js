@@ -83,6 +83,9 @@
     t.correct += result.correct;
     t.wrong += result.wrong;
     t.lastPlayedAt = Date.now();
+    // Marks the end of a test so the next test stops prioritising words
+    // that were "just learned" before this one (see SRS.pickSession).
+    if (typeof SRS !== 'undefined' && !SRS.isLearnMode(result.mode)) t.lastTestedAt = t.lastPlayedAt;
     progress.perTopic[result.topicId] = t;
 
     // history (last 60 entries)

@@ -125,10 +125,38 @@
     await auth.signOut();
   }
 
+  // Firebase sends a LINK (not a code) from noreply@<project>.firebaseapp.com.
+  // With "email enumeration protection" on (default for new projects) this
+  // resolves even when no account uses that email — the UI must say so.
   async function sendPasswordReset(email) {
     if (!enabled()) throw new Error('Firebase not configured');
     init();
+    try { auth.languageCode = (typeof I18N !== 'undefined' && I18N.getLang() === 'en') ? 'en' : 'vi'; } catch (e) {}
+    const canContinue = /^https?:$/.test(global.location && global.location.protocol);
+    if (canContinue) {
+      try {
+        // "Continue" button on Firebase's reset page brings the student back here.
+        await auth.sendPasswordResetEmail(email, { url: global.location.origin + '/' });
+        return;
+      } catch (e) {
+        const code = (e && e.code) || '';
+        // Domain not in Firebase Auth → Authorized domains: send without it.
+        if (!/continue-uri|unauthorized-domain|argument-error/.test(code)) throw e;
+      }
+    }
     await auth.sendPasswordResetEmail(email);
+  }
+
+  // Student side: progress handed over from accounts the teacher merged
+  // into this one (see js/accounts.js). Null when none / rules missing.
+  async function pullMerges() {
+    if (!enabled() || !currentUser) return null;
+    try {
+      const snap = await withTimeout(db.ref('merges/' + currentUser.uid).once('value'), 4000, 'Merges read');
+      return snap.val();
+    } catch (e) {
+      return null;
+    }
   }
 
   // --- Sync ---
@@ -197,14 +225,21 @@
         'Teacher list read'
       );
       const val = snap.val() || {};
-      const students = Object.keys(val).map((id) => ({
+      // Accounts merged into another one are hidden from every teacher view.
+      let mergedAway = {};
+      try {
+        const m = (await withTimeout(db.ref('merges').once('value'), 4000, 'Merges read')).val() || {};
+        Object.keys(m).forEach((keep) => Object.keys(m[keep] || {}).forEach((old) => { mergedAway[old] = keep; }));
+      } catch (e) { mergedAway = {}; /* rules not updated yet → show everything */ }
+      const students = Object.keys(val).filter((id) => !mergedAway[id]).map((id) => ({
         id,
         profile: val[id].profile || { id, name: id },
         progress: val[id].progress || Storage.emptyProgress(),
         updatedAt: val[id].updatedAt || 0,
       }));
-      console.log('[FirebaseSync] listAllStudents ok, ' + students.length + ' students');
-      return { students, error: null };
+      const hiddenCount = Object.keys(val).length - students.length;
+      console.log('[FirebaseSync] listAllStudents ok, ' + students.length + ' students (' + hiddenCount + ' merged)');
+      return { students, error: null, mergedCount: hiddenCount };
     } catch (e) {
       console.warn('[FirebaseSync] list failed', e);
       const code = (e && (e.code || e.message)) || '';
@@ -225,6 +260,7 @@
     signIn,
     signOut,
     sendPasswordReset,
+    pullMerges,
     pullCurrentUser,
     scheduleProgressPush,
     pushActiveProfile,

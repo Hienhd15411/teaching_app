@@ -27,11 +27,16 @@
     paintAuthForm(container, 'signin');
   }
 
-  function paintAuthForm(container, mode) {
+  function escapeAttr(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function paintAuthForm(container, mode, prefillEmail) {
     const t = I18N.t;
     const wrap = container.querySelector('#authForm');
     const isSignUp = mode === 'signup';
     let selectedAvatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
+    let typoAckFor = null; // email the student confirmed despite the typo warning
 
     wrap.innerHTML = `
       <div class="auth-tabs">
@@ -39,16 +44,19 @@
         <button class="auth-tab ${isSignUp ? 'active' : ''}" data-mode="signup">${t('auth.signUp')}</button>
       </div>
       ${isSignUp ? `
+        <div class="auth-note" style="margin:0 0 10px;">${t('auth.signupHadAccount')}</div>
         <label>${t('auth.displayName')}</label>
         <input type="text" id="authName" maxlength="32" autocomplete="name" />
         <label>${t('profile.pickAvatar')}</label>
         <div class="avatar-picker" id="avatarPicker"></div>
       ` : ''}
       <label>${t('auth.email')}</label>
-      <input type="email" id="authEmail" autocomplete="email" />
+      <input type="email" id="authEmail" autocomplete="email" value="${escapeAttr(prefillEmail || '')}" />
+      ${isSignUp ? `<div class="auth-hint">${t('auth.emailHint')}</div>` : ''}
       <label>${t('auth.password')}</label>
       <input type="password" id="authPassword" autocomplete="${isSignUp ? 'new-password' : 'current-password'}" />
       <div class="auth-error" id="authError" hidden></div>
+      <div class="auth-note" id="authInfo" hidden></div>
       <div class="btn-row" style="justify-content:space-between;align-items:center;">
         ${!isSignUp
           ? `<button class="btn-link" id="forgotBtn" type="button">${t('auth.forgot')}</button>`
@@ -73,13 +81,46 @@
       paintAvatars();
     }
 
+    const emailInput = () => wrap.querySelector('#authEmail');
     wrap.querySelectorAll('.auth-tab').forEach((tab) => {
-      tab.addEventListener('click', () => paintAuthForm(container, tab.getAttribute('data-mode')));
+      tab.addEventListener('click', () => paintAuthForm(container, tab.getAttribute('data-mode'), (emailInput().value || '').trim()));
     });
 
     const errEl = wrap.querySelector('#authError');
-    const showErr = (msg) => { errEl.textContent = msg; errEl.hidden = false; };
-    const clearErr = () => { errEl.hidden = true; errEl.textContent = ''; };
+    const infoEl = wrap.querySelector('#authInfo');
+    const hideInfo = () => { infoEl.hidden = true; infoEl.textContent = ''; };
+    const showErr = (msg) => { hideInfo(); errEl.textContent = msg; errEl.hidden = false; };
+    const clearErr = () => { errEl.hidden = true; errEl.textContent = ''; hideInfo(); };
+    // Error text + action buttons (e.g. "Dùng abc@gmail.com", "Đăng nhập").
+    const showErrActions = (msg, actions) => {
+      hideInfo();
+      errEl.innerHTML = '';
+      const p = document.createElement('div');
+      p.textContent = msg;
+      errEl.appendChild(p);
+      const row = document.createElement('div');
+      row.className = 'auth-actions';
+      actions.forEach((a) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn secondary';
+        b.textContent = a.label;
+        b.addEventListener('click', a.onClick);
+        row.appendChild(b);
+      });
+      errEl.appendChild(row);
+      errEl.hidden = false;
+    };
+    // Returns true when the caller should stop (typo shown, not yet confirmed).
+    const typoGate = (email) => {
+      const fix = typeof Accounts !== 'undefined' ? Accounts.suggestEmail(email) : null;
+      if (!fix || typoAckFor === email.toLowerCase()) return false;
+      showErrActions(t('auth.typoSuggest').replace('{email}', email).replace('{fix}', fix), [
+        { label: t('auth.typoUseFix').replace('{fix}', fix), onClick: () => { emailInput().value = fix; clearErr(); } },
+        { label: t('auth.typoKeep'), onClick: () => { typoAckFor = email.toLowerCase(); clearErr(); } },
+      ]);
+      return true;
+    };
 
     const submitBtn = wrap.querySelector('#submitAuthBtn');
     submitBtn.addEventListener('click', async () => {
@@ -91,6 +132,9 @@
       if (!email || !password) return showErr(t('auth.errMissing'));
       if (isSignUp && !name) return showErr(t('auth.errMissingName'));
       if (password.length < 6) return showErr(t('auth.errShortPassword'));
+      // A mistyped address at sign-up means the reset mail can never
+      // arrive later — the #1 cause of students re-registering.
+      if (isSignUp && typoGate(email)) return;
 
       submitBtn.disabled = true;
       submitBtn.textContent = t('auth.working');
@@ -127,9 +171,23 @@
         }, 2000);
       } catch (e) {
         clearTimeout(watchdog);
-        showErr(mapAuthError(e));
         submitBtn.disabled = false;
         submitBtn.textContent = isSignUp ? t('auth.createAccount') : t('auth.signIn');
+        const code = (e && e.code) || '';
+        if (isSignUp && code === 'auth/email-already-in-use') {
+          // Steer back to the existing account instead of a new one.
+          showErrActions(t('auth.errEmailInUse'), [
+            { label: t('auth.signInThis'), onClick: () => paintAuthForm(container, 'signin', email) },
+            { label: t('auth.forgot'), onClick: () => { paintAuthForm(container, 'signin', email); setTimeout(() => { const f = container.querySelector('#forgotBtn'); if (f) f.click(); }, 0); } },
+          ]);
+          return;
+        }
+        if (!isSignUp && /wrong-password|invalid-credential|invalid-login-credentials|user-not-found/.test(code)) {
+          const fix = typeof Accounts !== 'undefined' ? Accounts.suggestEmail(email) : null;
+          showErr(t('auth.errWrongCredentials') + ' ' + (fix ? t('auth.typoHintSignin').replace('{fix}', fix) : t('auth.dontRegisterAgain')));
+          return;
+        }
+        showErr(mapAuthError(e));
       }
     });
 
@@ -139,15 +197,25 @@
 
     const forgot = wrap.querySelector('#forgotBtn');
     if (forgot) {
+      let cooldownUntil = 0;
       forgot.addEventListener('click', async () => {
-        const email = (wrap.querySelector('#authEmail').value || '').trim();
+        const email = (emailInput().value || '').trim();
         if (!email) return showErr(t('auth.enterEmailForReset'));
+        if (Date.now() < cooldownUntil) return showErr(t('auth.resetWait'));
         clearErr();
+        if (typoGate(email)) return;
+        forgot.disabled = true;
         try {
           await FirebaseSync.sendPasswordReset(email);
-          alert(t('auth.resetSent'));
+          cooldownUntil = Date.now() + 60000;
+          // Firebase does not reveal whether the email has an account, and
+          // sends a LINK (not a code) that often lands in Spam.
+          infoEl.textContent = '📧 ' + t('auth.resetSentDetail').replace('{email}', email);
+          infoEl.hidden = false;
         } catch (e) {
           showErr(mapAuthError(e));
+        } finally {
+          forgot.disabled = false;
         }
       });
     }
