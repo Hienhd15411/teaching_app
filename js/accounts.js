@@ -40,6 +40,11 @@
   }
 
   // 'abc@gmial.com' → 'abc@gmail.com'; null when the domain looks fine.
+  // Providers with country domains (hotmail.fr, yahoo.co.uk) are valid;
+  // only Gmail and iCloud exist solely on .com.
+  const PROVIDERS = ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'live'];
+  const COM_ONLY = { gmail: true, icloud: true };
+  const TLD_TYPOS = { con: 1, cmo: 1, comm: 1, cm: 1, om: 1, vom: 1, xom: 1, co: 1, c: 1, cpm: 1, coom: 1 };
   function suggestEmail(email) {
     const e = String(email || '').trim().toLowerCase();
     const at = e.lastIndexOf('@');
@@ -47,15 +52,22 @@
     const local = e.slice(0, at);
     const dom = e.slice(at + 1);
     if (!dom || KNOWN_OK.has(dom) || /\.(edu|gov|ac|org)(\.[a-z]{2})?$/.test(dom)) return null;
-    // "gmail", "gmail.com.vn", "gmail.vn" → gmail.com (Gmail has no other domain)
-    const label = dom.split('.')[0];
-    const byLabel = { gmail: 'gmail.com', gmai: 'gmail.com', gmial: 'gmail.com', gmil: 'gmail.com', gamil: 'gmail.com', yahoo: 'yahoo.com', hotmail: 'hotmail.com', outlook: 'outlook.com', icloud: 'icloud.com' };
-    if (byLabel[label] && dom !== byLabel[label] && !KNOWN_OK.has(dom)) return local + '@' + byLabel[label];
-    let best = null;
-    let bd = 99;
-    POPULAR.forEach((p) => { const d = lev(dom, p); if (d < bd) { bd = d; best = p; } });
-    if (best && bd > 0 && bd <= 2) return local + '@' + best;
-    return null;
+    const dot = dom.indexOf('.');
+    const label = dot < 0 ? dom : dom.slice(0, dot);
+    const tld = dot < 0 ? '' : dom.slice(dot + 1);
+    const tldOk = !!tld && !TLD_TYPOS[tld] && /^[a-z]{2,6}(\.[a-z]{2})?$/.test(tld);
+    let provider = PROVIDERS.indexOf(label) >= 0 ? label : null;
+    if (!provider && label.length >= 3) {
+      let bd = 99;
+      // Fuzzy only against long provider names: "live" would match real
+      // domains like love.com / lime.com.
+      PROVIDERS.filter((p) => p.length >= 5).forEach((p) => { const d = lev(label, p); if (d < bd) { bd = d; provider = p; } });
+      if (bd > 2) provider = null;
+    }
+    if (!provider) return null;
+    const fixedTld = COM_ONLY[provider] ? 'com' : (tldOk ? tld : 'com');
+    const fixed = provider + '.' + fixedTld;
+    return fixed === dom ? null : local + '@' + fixed;
   }
 
   // Same mailbox under different spellings: Gmail ignores dots and +tags,
@@ -141,17 +153,17 @@
       db.ref('feature_flags/' + keep.id).once('value').then((s) => s.val()).catch(() => null),
     ]);
 
-    // 1) Progress hand-off + hide the old account. Written first so a
-    //    missing /merges rule fails before anything else is touched.
-    await db.ref('merges/' + keep.id + '/' + old.id).set(clean({
+    // Everything in ONE multi-path update: either the old account is hidden
+    // AND its tuition moved, or nothing changes (no half-merged state).
+    const update = {};
+    // 1) Progress hand-off + hide the old account.
+    update['merges/' + keep.id + '/' + old.id] = clean({
       at,
       by: me.uid,
       fromEmail: (old.profile && old.profile.email) || '',
       fromName: (old.profile && old.profile.name) || '',
       progress: old.progress || null,
-    }));
-
-    const update = {};
+    });
     // 2) Tuition: union payments + attendance; the kept account's plan wins.
     if (bOld) {
       const merged = Object.assign({}, bOld, bKeep || {});
@@ -162,11 +174,12 @@
       update['billing/' + keep.id] = clean(merged);
       update['billing/' + old.id] = null;
     }
-    // 3) Group membership.
+    // 3) Group membership follows the kept account's (merged) plan.
+    const keptPlan = (bKeep && bKeep.plan) || (bOld && bOld.plan) || null;
     Object.entries(gSnap || {}).forEach(([gid, g]) => {
       if (g && g.members && g.members[old.id]) {
         update['groups/' + gid + '/members/' + old.id] = null;
-        update['groups/' + gid + '/members/' + keep.id] = true;
+        if (keptPlan && keptPlan.type === 'group' && keptPlan.groupId === gid) update['groups/' + gid + '/members/' + keep.id] = true;
       }
     });
     // 4) Feature flags (e.g. interview access).
@@ -174,7 +187,7 @@
       if (!fKeep) update['feature_flags/' + keep.id] = clean(fOld);
       update['feature_flags/' + old.id] = null;
     }
-    if (Object.keys(update).length) await db.ref().update(update);
+    await db.ref().update(update);
   }
 
   global.Accounts = { suggestEmail, canonicalEmail, normName, findDuplicates, mergeInto };

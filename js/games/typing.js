@@ -2,7 +2,7 @@
   'use strict';
 
   function start(opts) {
-    const { container, topicId, words, onExit, onFinish } = opts;
+    const { container, topicId, words, allTopicWords, onExit, onFinish } = opts;
     const t = I18N.t;
 
     let idx = 0;
@@ -21,6 +21,9 @@
       if (fbTimer) { clearTimeout(fbTimer); fbTimer = null; }
       if (fbKeyHandler) { document.removeEventListener('keydown', fbKeyHandler); fbKeyHandler = null; }
     }
+
+    // Teardown when the student leaves by ANY route (nav bar, device Back).
+    if (global.App && App.onLeave) App.onLeave(() => { clearFeedbackArm(); });
 
     function renderHud() {
       const pct = Math.round((idx / words.length) * 100);
@@ -107,7 +110,10 @@
       const answer = normalize(input.value);
       if (!answer) return;
 
-      const isCorrect = answerKeys(w.en).has(answer);
+      // Any word in this list with the same Vietnamese meaning is also right
+      // (prompt "rẻ" accepts both "cheap" and "affordable").
+      const sameVi = (allTopicWords || words).filter((x) => String(x.vi || '').toLowerCase().trim() === String(w.vi || '').toLowerCase().trim());
+      const isCorrect = answerKeys(w.en).has(answer) || sameVi.some((x) => answerKeys(x.en).has(answer));
       const progress = Storage.getProgress();
       SRS.updateWord(progress, topicId, w.en, isCorrect);
       Storage.saveProgress(progress);

@@ -10,8 +10,27 @@
 
   const SR = global.SpeechRecognition || global.webkitSpeechRecognition;
 
+  // Chrome writes numbers as digits ("row 20", "15C"); targets spell them
+  // out. Both sides are spelled out before comparing.
+  const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  function numWords(n) {
+    if (n < 20) return ONES[n];
+    if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + ONES[n % 10] : '');
+    if (n < 1000) return ONES[Math.floor(n / 100)] + ' hundred' + (n % 100 ? ' ' + numWords(n % 100) : '');
+    return String(n);
+  }
+  function spellNumbers(s) {
+    return String(s || '').replace(/(\d+)([a-z]?)/gi, (m, d, letter) => {
+      const n = parseInt(d, 10);
+      return (n < 1000 ? numWords(n) : d) + (letter ? ' ' + letter : '');
+    });
+  }
+
   function normalize(s) {
-    return String(s || '').toLowerCase().trim().replace(/[.,!?;:'"()]/g, '').replace(/\s+/g, ' ');
+    return spellNumbers(String(s || '').toLowerCase()).trim()
+      .replace(/[\u2018\u2019]/g, "'").replace(/[.,!?;:'"()]/g, '').replace(/\s+/g, ' ');
   }
   function words(s) { const n = normalize(s); return n ? n.split(' ') : []; }
 
@@ -32,33 +51,42 @@
     return dp[n];
   }
 
-  // Per-word grade: for each target word, find the closest spoken word —
-  // also trying adjacent said words JOINED, because ASR often splits
-  // ("seatbelt" → "seat belt") or merges words even on a perfect read.
+  // Per-word grade, IN ORDER: each target word is looked for in the next
+  // few spoken words (also two adjacent spoken words joined, because ASR
+  // splits "seatbelt" → "seat belt"). Saying the words in another order,
+  // or burying the sentence in extra words, no longer earns 10/10.
   // ratio = distance / word length → 0 good, higher worse.
+  const WINDOW = 4;
   function scorePhrase(target, transcript) {
     const tgt = words(target);
     const said = words(transcript);
+    let j = 0;
     const perWord = tgt.map((w) => {
-      let best = Infinity;
-      said.forEach((s) => { const d = levenshtein(w, s); if (d < best) best = d; });
-      for (let j = 0; j < said.length - 1; j++) {
-        const d = levenshtein(w, said[j] + said[j + 1]);
-        if (d < best) best = d;
+      let best = w.length;
+      let bestEnd = j;
+      for (let k = j; k < Math.min(said.length, j + WINDOW); k++) {
+        const d1 = levenshtein(w, said[k]);
+        if (d1 < best) { best = d1; bestEnd = k + 1; }
+        if (k + 1 < said.length) {
+          const d2 = levenshtein(w, said[k] + said[k + 1]);
+          if (d2 < best) { best = d2; bestEnd = k + 2; }
+        }
       }
-      if (best === Infinity) best = w.length;
       const ratio = best / Math.max(1, w.length);
+      if (ratio <= 0.5) j = bestEnd; // advance only past a plausible match
       const state = ratio <= 0.25 ? 'good' : ratio <= 0.5 ? 'ok' : 'bad';
       return { word: w, ratio, state };
     });
     const goodCount = perWord.filter((p) => p.state === 'good').length;
     const okCount = perWord.filter((p) => p.state === 'ok').length;
-    const perWordScore = tgt.length ? (goodCount + okCount * 0.5) / tgt.length : 0;
+    // Many more words than the sentence has → proportional penalty.
+    const extra = said.length > tgt.length + 2 ? (tgt.length + 2) / said.length : 1;
+    const perWordScore = tgt.length ? ((goodCount + okCount * 0.5) / tgt.length) * extra : 0;
 
     // Whole-utterance match ignoring word boundaries: strip spaces and
     // compare character sequences. A correct read whose only "error" is
     // where ASR put the spaces (seat belt / a board / take off) matches
-    // here and earns full marks.
+    // here and earns full marks; extra speech counts as edits.
     const tj = normalize(target).replace(/\s+/g, '');
     const sj = normalize(transcript).replace(/\s+/g, '');
     const overall = tj.length ? 1 - Math.min(1, levenshtein(tj, sj) / tj.length) : 0;
@@ -85,26 +113,45 @@
       // Base dictionary of common/function words first, then topical vocab.
       const base = global.IPA_DICT || {};
       Object.keys(base).forEach((k) => { ipaMap[normalize(k)] = base[k]; });
+      const addWord = (en, ipa) => {
+        const key = normalize(en);
+        if (key && ipa && !ipaMap[key]) ipaMap[key] = String(ipa).replace(/^\/|\/$/g, '');
+      };
+      // Topic + TOEIC vocabulary (single words and short phrases).
       const V = global.VOCAB || {};
-      Object.keys(V).forEach((topic) => {
-        (V[topic] || []).forEach((w) => {
-          if (w && w.en && w.ipa) {
-            const key = normalize(w.en);
-            if (key && !ipaMap[key]) ipaMap[key] = w.ipa;
-          }
-        });
-      });
+      Object.keys(V).forEach((topic) => (V[topic] || []).forEach((w) => { if (w) addWord(w.en, w.ipa); }));
+      const T = global.TOEIC;
+      if (T && T.EDITIONS && T.PARTS && T.allWordsInPart) {
+        T.EDITIONS.forEach((ed) => T.PARTS.forEach((p) => {
+          try { T.allWordsInPart(ed.id, p.id).forEach((w) => { if (w) addWord(w.en, w.ipa); }); } catch (e) {}
+        }));
+      }
+      // Sample drill phrases carry a full-sentence IPA; when the word count
+      // matches the IPA token count, each word's transcription is known.
+      ((global.PRON_DRILL && global.PRON_DRILL.SETS) || []).forEach((s) => (s.items || []).forEach((it) => {
+        const ws = normalize(it.en).split(' ').filter(Boolean);
+        const ps = String(it.ipa || '').trim().split(/\s+/).filter(Boolean);
+        if (ws.length && ws.length === ps.length) ws.forEach((w, i) => addWord(w, ps[i]));
+      }));
     } catch (e) {}
     return ipaMap;
   }
 
-  function ipaForSentence(text) {
+  // Word-by-word IPA guide for a custom sentence. With `detail`, returns
+  // { ipa, unknown: [words not in the dictionary] } (used by QC).
+  function ipaForSentence(text, detail) {
     const map = buildIpaMap();
     const toks = normalize(text).split(' ').filter(Boolean);
-    if (!toks.length) return '';
+    const unknown = [];
     let known = 0;
-    const parts = toks.map((w) => { if (map[w]) { known += 1; return map[w]; } return w; });
-    return known ? parts.join(' ') : '';
+    const parts = toks.map((w) => {
+      const hit = map[w] || (w.endsWith("'s") && map[w.slice(0, -2)] ? map[w.slice(0, -2)] + 'z' : null);
+      if (hit) { known += 1; return hit; }
+      unknown.push(w);
+      return w;
+    });
+    const ipa = known ? parts.join(' ') : '';
+    return detail ? { ipa, unknown } : ipa;
   }
 
   function start(opts) {
@@ -122,6 +169,9 @@
       if (recognition) { try { recognition.onend = null; recognition.stop(); } catch (e) {} recognition = null; }
       listening = false;
     }
+
+    // Teardown when the student leaves by ANY route (nav bar, device Back).
+    if (global.App && App.onLeave) App.onLeave(() => { stopAsr(); });
 
     // ---- set picker ----
     function renderPicker() {
@@ -200,7 +250,7 @@
             <span class="chip">${set.icon} ${esc(set.label[lang] || set.label.vi)}</span>
           </div>
           <div class="pd-card">
-            <div class="pd-target" id="pdTarget">${item.en.split(/\s+/).map((w) => `<span class="pd-w">${esc(w)}</span>`).join(' ')}
+            <div class="pd-target" id="pdTarget">${item.en.split(/\s+/).filter((w) => normalize(w)).map((w) => `<span class="pd-w">${esc(w)}</span>`).join(' ')}
               <button class="speak-btn big" type="button" data-speak="${esc(item.en)}">🔊</button>
             </div>
             ${item.ipa ? `<div class="pd-ipa">/ ${esc(item.ipa)} /</div>` : `<div class="muted-note">${t('pd.customNoIpa')}</div>`}
@@ -212,13 +262,20 @@
               <span id="pdMicLabel">${t('pd.tapToRead')}</span>
             </button>
           </div>
+          ${!SR ? `<p class="muted-note" style="text-align:center;">${t('pd.noAsr')}</p>
+            <div class="btn-row" style="justify-content:center;"><button class="btn secondary" type="button" id="pdSkip">${t('pd.skip')} →</button></div>` : ''}
           <div class="answer-feedback" id="pdFeedback"></div>
         </section>
       `;
       container.querySelector('#drillBack').addEventListener('click', renderPicker);
       const micBtn = container.querySelector('#pdMic');
       if (SR) micBtn.addEventListener('click', toggleMic);
-      else micBtn.disabled = true;
+      else {
+        // Firefox / some iOS browsers: no speech recognition — let the
+        // student listen and move on instead of being stuck on card 1.
+        micBtn.disabled = true;
+        container.querySelector('#pdSkip').addEventListener('click', () => { idx += 1; renderCard(); });
+      }
       if (typeof Pronunciation !== 'undefined') {
         Pronunciation.bindSpeakers(container);
         Pronunciation.speak(item.en);
@@ -233,13 +290,21 @@
       recognition.interimResults = false;
       recognition.maxAlternatives = 3;
       let transcript = '';
+      const mySet = set;
+      const myIdx = idx;
+      const stillHere = () => set === mySet && idx === myIdx && !!container.querySelector('#pdFeedback');
       recognition.onresult = (e) => {
         for (let i = e.resultIndex; i < e.results.length; i++) {
           if (e.results[i].isFinal) transcript += e.results[i][0].transcript + ' ';
         }
       };
-      recognition.onend = () => { listening = false; syncMic(); if (transcript.trim()) showResult(transcript.trim()); };
-      recognition.onerror = () => { listening = false; syncMic(); };
+      recognition.onend = () => { listening = false; syncMic(); if (transcript.trim() && stillHere()) showResult(transcript.trim()); };
+      recognition.onerror = (e) => {
+        listening = false; syncMic();
+        const code = e && e.error;
+        if (code === 'not-allowed' || code === 'service-not-allowed') App.toast('🎤 ' + t('iv.micDenied'));
+        else if (code === 'no-speech') App.toast('🎤 ' + t('iv.noSpeech'));
+      };
       try { recognition.start(); listening = true; } catch (e) { listening = false; }
       syncMic();
     }
@@ -255,7 +320,7 @@
     function showResult(transcript) {
       const item = set.items[idx];
       const res = scorePhrase(item.en, transcript);
-      scores.push(res.score);
+      scores[idx] = res.score; // a retry replaces this phrase's score
 
       // Recolor each target word.
       const targetEl = container.querySelector('#pdTarget');
@@ -295,7 +360,14 @@
     }
 
     function renderResult() {
-      const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length * 10) / 10 : 0;
+      const done = scores.filter((x) => typeof x === 'number');
+      const avg = done.length ? Math.round(done.reduce((a, b) => a + b, 0) / done.length * 10) / 10 : 0;
+      // Log the practice so it counts for streak, "studied today" on the
+      // schedule and roadmap drill items.
+      if (done.length && set && typeof Progress !== 'undefined') {
+        const good = done.filter((x) => x >= 7).length;
+        try { Progress.finishSession({ mode: 'drill', topicId: 'drill_' + set.id, correct: good, wrong: done.length - good, xp: good * 5, wordsSeen: done.length }); } catch (e) {}
+      }
       container.innerHTML = `
         <section class="view game-view iv-view">
           <div class="game-result">
@@ -324,5 +396,5 @@
     renderPicker();
   }
 
-  global.PronDrill = { start, scorePhrase };
+  global.PronDrill = { start, scorePhrase, ipaForSentence };
 })(window);

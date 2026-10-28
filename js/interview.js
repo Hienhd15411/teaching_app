@@ -109,6 +109,19 @@
     'even', 'that is why', 'once', 'if', 'until', 'both', 'instead',
   ];
 
+  // Whole-word match of a keyword/phrase in normalized text. Keywords are
+  // normalized the same way as the answer ("hard-working" → "hard working",
+  // which never matched before), and may carry a plural/tense ending
+  // ("teams", "worked") — but "as" no longer matches inside "was" and
+  // "team" no longer inside "steam".
+  const SUFFIX = '(?:s|es|ed|d|ing|er|ers|ly|ies)?';
+  function phraseHit(normText, phrase) {
+    const p = normalizeText(phrase).trim();
+    if (!p) return false;
+    const rx = new RegExp(' ' + p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, ' ') + SUFFIX + ' ');
+    return rx.test(normText);
+  }
+
   function markerHit(text, marker) {
     const rx = new RegExp('\\b' + marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+') + '\\b', 'i');
     return rx.test(text);
@@ -122,6 +135,9 @@
   function scoreAnswer(question, rawText, pronConfidence) {
     const text = normalizeText(rawText);
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    if (!words) {
+      return { total: 0, content: 0, fluency: 0, pron: null, vocab: 0, matched: [], missed: (question.keywords || []).map((k) => String(k).split('|')[0]), words: 0, fillerCount: 0 };
+    }
 
     // Each keyword is a synonym group 'label|alt1|alt2...' — the idea is
     // covered if ANY variant appears. Candidates say "friendly and
@@ -130,7 +146,7 @@
     const missed = [];
     (question.keywords || []).forEach((k) => {
       const alts = String(k).split('|');
-      const hit = alts.some((a) => text.indexOf(a.trim().toLowerCase()) >= 0);
+      const hit = alts.some((a) => phraseHit(text, a));
       if (hit) matched.push(alts[0]); else missed.push(alts[0]);
     });
     // Keyword lists are a SUPERSET of possible ideas — a strong answer
@@ -150,7 +166,7 @@
     const fluency = Math.max(0, Math.min(1, words / minWords) - Math.min(0.3, fillerCount * 0.05));
 
     let vocabHits = 0;
-    INTERVIEW_BANK.AVIATION_VOCAB.forEach((v) => { if (text.indexOf(v) >= 0) vocabHits += 1; });
+    INTERVIEW_BANK.AVIATION_VOCAB.forEach((v) => { if (phraseHit(text, v)) vocabHits += 1; });
     const vocab = Math.min(1, vocabHits / 2);
 
     // Pronunciation from ASR confidence. Chrome tends to report 0.7-0.95
@@ -358,6 +374,7 @@
     let followUpsUsed = 0;
     let current = null;
     let answerConfidences = []; // ASR confidence samples for the current answer
+    let submitted = false;      // current question already scored (timer/toggle can't re-submit)
     let recognition = null;
     let listening = false;
     let timerId = null;
@@ -370,10 +387,11 @@
 
     function stopAsr() {
       if (recognition) {
-        try { recognition.onend = null; recognition.stop(); } catch (e) {}
+        try { recognition.onend = null; recognition.onresult = null; recognition.onerror = null; recognition.stop(); } catch (e) {}
         recognition = null;
       }
       listening = false;
+      syncMicUi();
     }
 
     function stopTimer() {
@@ -386,6 +404,9 @@
       if (typeof Pronunciation !== 'undefined') Pronunciation.cancel();
     }
 
+    // Teardown when the student leaves by ANY route (nav bar, device Back).
+    if (global.App && App.onLeave) App.onLeave(() => { cleanup(); });
+
     function catBadge(q) {
       const sec = sectionOf[q.section];
       const c = sec || (INTERVIEW_BANK.CATEGORIES[q.cat]) || { icon: '❓', label: { vi: q.cat, en: q.cat } };
@@ -396,6 +417,7 @@
       if (!queue.length) return renderResult();
       current = queue.shift();
       answerConfidences = [];
+      submitted = false;
       const answered = results.length;
       const totalPlanned = answered + 1 + queue.length;
 
@@ -442,7 +464,7 @@
         const chip = container.querySelector('#ivTimer');
         chip.hidden = !timerOn;
         stopTimer();
-        if (timerOn) startTimer();
+        if (timerOn && !submitted) startTimer();
       });
       container.querySelector('#ivSubmit').addEventListener('click', submit);
       if (asrSupported) container.querySelector('#ivMic').addEventListener('click', toggleMic);
@@ -498,7 +520,12 @@
         textarea.value = (committed + interim).trim();
       };
       recognition.onend = () => { listening = false; syncMicUi(); };
-      recognition.onerror = () => { listening = false; syncMicUi(); };
+      recognition.onerror = (e) => {
+        listening = false; syncMicUi();
+        const code = e && e.error;
+        if (code === 'not-allowed' || code === 'service-not-allowed') App.toast('🎤 ' + t('iv.micDenied'));
+        else if (code === 'no-speech') App.toast('🎤 ' + t('iv.noSpeech'));
+      };
       try { recognition.start(); listening = true; } catch (e) { listening = false; }
       syncMicUi();
     }
@@ -508,15 +535,22 @@
       const label = container.querySelector('#ivMicLabel');
       if (!btn) return;
       btn.classList.toggle('listening', listening);
+      // While the mic writes into the box, typing would be overwritten.
+      const ta = container.querySelector('#ivText');
+      if (ta) ta.readOnly = listening;
       if (label) label.textContent = listening ? t('iv.listening') : t('iv.tapToAnswer');
     }
 
     function submit() {
+      if (submitted) return;
       stopAsr();
       stopTimer();
       const textarea = container.querySelector('#ivText');
       if (!textarea) return;
+      submitted = true;
       const text = textarea.value.trim();
+      // Spoke, then cleared the box → nothing was answered.
+      if (!text) answerConfidences = [];
       const avgConf = answerConfidences.length
         ? answerConfidences.reduce((a, b) => a + b, 0) / answerConfidences.length : null;
       const score = scoreAnswer(current, text, avgConf);
@@ -526,7 +560,7 @@
       if (!current.isFollowUp && current.follow && followUpsUsed < MAX_FOLLOWUPS && text) {
         const norm = normalizeText(text);
         for (const key of Object.keys(current.follow)) {
-          if (norm.indexOf(key.toLowerCase()) >= 0) {
+          if (phraseHit(norm, key)) {
             const f = current.follow[key];
             queue.unshift({
               id: current.id + '_f_' + key,
@@ -607,6 +641,8 @@
           bestCombo: 0,
           durationSec: (Date.now() - startTs) / 1000,
           wordsSeen: results.length,
+          // Which sections were practised → ticks the matching roadmap items.
+          sections: Array.from(new Set(results.map((r) => r.question && r.question.section).filter(Boolean))),
         });
       } catch (e) {}
 

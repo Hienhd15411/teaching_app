@@ -34,11 +34,24 @@
       if (fbKeyHandler) { document.removeEventListener('keydown', fbKeyHandler); fbKeyHandler = null; }
     }
 
+    // Teardown when the student leaves by ANY route (nav bar, device Back).
+    if (global.App && App.onLeave) App.onLeave(() => { clearFeedbackArm(); });
+
     // For each word, precompute question direction (50% en→vi, 50% vi→en) and options
     const questions = words.map((w) => {
       const enToVi = Math.random() < 0.5;
-      const others = distractorPool.filter((x) => x.en !== w.en);
-      const picks = shuffle(others).slice(0, 3);
+      // Distractors must differ from the answer AND from each other in both
+      // languages, or a question can have two right / identical options
+      // (e.g. "có thể" = possible / likely / probable).
+      const norm = (s) => String(s || '').toLowerCase().trim();
+      const usedEn = new Set([norm(w.en)]);
+      const usedVi = new Set([norm(w.vi)]);
+      const picks = [];
+      shuffle(distractorPool).forEach((x) => {
+        if (picks.length >= 3 || usedEn.has(norm(x.en)) || usedVi.has(norm(x.vi))) return;
+        usedEn.add(norm(x.en)); usedVi.add(norm(x.vi));
+        picks.push(x);
+      });
       const options = shuffle([w, ...picks]);
       return { word: w, enToVi, options };
     });

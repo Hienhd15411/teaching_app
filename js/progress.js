@@ -60,6 +60,13 @@
     return progress.streak;
   }
 
+  // Stored streak only changes when a session finishes; a student who
+  // stopped a month ago still has streak=7 saved. Display this instead.
+  function effectiveStreak(progress) {
+    if (!progress || !progress.lastActiveDate) return 0;
+    return daysBetween(progress.lastActiveDate, todayStr()) <= 1 ? (progress.streak || 0) : 0;
+  }
+
   function awardBadge(progress, id, newly) {
     if (progress.badges.indexOf(id) === -1) {
       progress.badges.push(id);
@@ -98,6 +105,7 @@
       wrong: result.wrong,
       xp: result.xp,
     });
+    if (Array.isArray(result.sections) && result.sections.length) progress.history[progress.history.length - 1].sections = result.sections;
     if (progress.history.length > 300) progress.history = progress.history.slice(-300);
 
     // badges
@@ -144,7 +152,7 @@
       xpInLevel: lvl.xpInLevel,
       xpForNext: lvl.xpForNext,
       pct: lvl.pct,
-      streak: progress.streak || 0,
+      streak: effectiveStreak(progress),
       wordsSeen,
       mastered,
     };
@@ -162,6 +170,7 @@
     globalStats,
     getBadgeDef,
     updateStreak,
+    effectiveStreak,
     todayStr,
   };
 })(window);

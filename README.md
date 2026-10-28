@@ -63,6 +63,10 @@ Yêu cầu học viên vào **Tiến độ → ⬇️ Xuất dữ liệu**, gử
 
 Tab **Lớp học → Học phí** có khối **📅 Google Calendar**: đẩy từng khung giờ dạy (lặp hàng tuần, nhắc trước 15') và **một nhắc tổng hợp mỗi sáng** liệt kê học viên cần thu học phí hôm đó lên lịch riêng của giáo viên. Cài đặt 1 lần theo `docs/GOOGLE-CALENDAR.md` (tạo OAuth Client ID trong Google Cloud, dán vào `js/firebase-config.js`).
 
+### QC trước khi deploy
+
+Chạy `TZ=Asia/Ho_Chi_Minh node qc/run.js` (cần `npm i -D playwright && npx playwright install chromium` lần đầu). Phần kiểm tra thủ công với Firebase/email/điện thoại thật: `docs/QC-CHECKLIST.md`. Báo cáo QC gần nhất: `docs/QC-REPORT.md`.
+
 ## Quy tắc điểm (gamification)
 
 | Hành động              | XP  |

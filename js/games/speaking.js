@@ -98,6 +98,7 @@
     let combo = 0;
     let bestCombo = 0;
     let recognition = null;
+    const graded = {};
     let isListening = false;
     const startTs = Date.now();
 
@@ -234,6 +235,9 @@
       if (micLabel) micLabel.textContent = t('game.tapToSpeak');
     }
 
+    // Teardown when the student leaves by ANY route (nav bar, device Back).
+    if (global.App && App.onLeave) App.onLeave(() => { stopListening(); clearFeedbackArm(); });
+
     function showError(msg) {
       const feedback = container.querySelector('#feedback');
       if (!feedback) return;
@@ -252,6 +256,10 @@
       stopListening();
       const w = words[idx];
       const result = grade(alts, w.en);
+      // Retries are practice: only the first attempt per word counts toward
+      // progress, XP and the score (re-grading let one word jump to box 5).
+      if (graded[idx]) { renderFeedback(w, result); return; }
+      graded[idx] = true;
       const progress = Storage.getProgress();
       const wasCorrect = result.grade === 'exact' || result.grade === 'close';
       SRS.updateWord(progress, topicId, w.en, wasCorrect);

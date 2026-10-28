@@ -22,7 +22,14 @@
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
-  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  // Local calendar date (Vietnam is UTC+7: toISOString() gives YESTERDAY
+  // between 00:00 and 07:00).
+  function localYmd(d) {
+    const x = d instanceof Date ? d : new Date(d);
+    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  }
+
+  function todayStr() { return localYmd(new Date()); }
 
   // ---------- level / roadmap (pure) ----------
 
@@ -79,7 +86,9 @@
     const since = rm.createdAt || 0;
     const perTopic = progress.perTopic || {};
     const history = Array.isArray(progress.history) ? progress.history : [];
-    const interviewSessions = history.filter((h) => h.mode === 'interview' && (h.ts || 0) >= since).length;
+    const ivSince = history.filter((h) => h.mode === 'interview' && (h.ts || 0) >= since);
+    // Older sessions didn't record their sections: they tick items in order.
+    const interviewSessions = ivSince.filter((h) => !Array.isArray(h.sections)).length;
     let interviewSeen = 0;
     let total = 0;
     let done = 0;
@@ -98,8 +107,11 @@
               return m && m[1] === it.target && (perTopic[k].lastPlayedAt || 0) >= since;
             });
           } else if (it.type === 'interview') {
-            interviewSeen += 1;
-            ok = interviewSessions >= interviewSeen;
+            ok = ivSince.some((h) => Array.isArray(h.sections) && h.sections.indexOf(it.target) >= 0);
+            if (!ok) { interviewSeen += 1; ok = interviewSessions >= interviewSeen; }
+          } else if (it.type === 'drill') {
+            const pt = perTopic['drill_' + it.target];
+            ok = !!(pt && (pt.lastPlayedAt || 0) >= since);
           }
         }
         if (ok) done += 1;
@@ -149,7 +161,7 @@
         const due = new Date(d); due.setHours(hh || 0, mm || 0, 0, 0);
         if (due > now) continue; // still upcoming
         planned += 1;
-        const ds = d.toISOString().slice(0, 10);
+        const ds = localYmd(d);
         if (!this.studiedOn(progress, ds)) { missed += 1; missedDays.push(DAY_KEYS[d.getDay()]); }
       }
       return { missed, planned, missedDays };
@@ -182,7 +194,7 @@
         'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Vocab Quest//Study Plan//VI', 'CALSCALE:GREGORIAN',
         'BEGIN:VEVENT',
         'UID:vocabquest-study-' + Date.now() + '@vocabquest',
-        'DTSTAMP:' + fmt(new Date()),
+        'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''), // RFC 5545: UTC with Z
         'DTSTART:' + fmt(start),
         'DTEND:' + fmt(end),
         'RRULE:FREQ=WEEKLY;BYDAY=' + days,
@@ -212,9 +224,12 @@
           const p = Storage.getProgress();
           const sch = this.get(p);
           if (!sch || !sch.remind || !this.isDay(sch, new Date())) return;
+          // Fire once when the study time has PASSED (within 3 hours): a
+          // throttled background tab can skip the exact minute.
           const now = new Date();
-          const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-          if (hhmm !== sch.time) return;
+          const [hh, mm] = String(sch.time || '20:00').split(':').map(Number);
+          const due = new Date(); due.setHours(hh || 0, mm || 0, 0, 0);
+          if (now < due || now - due > 3 * 3600000) return;
           const key = 'vlt_notified_' + todayStr();
           if (localStorage.getItem(key) || this.studiedOn(p, todayStr())) return;
           localStorage.setItem(key, '1');
@@ -238,10 +253,26 @@
     const out = [];
     Object.keys(perTier).forEach((tier) => {
       const pool = [];
-      (tiers[tier] || []).forEach((tid) => (V[tid] || []).forEach((w) => pool.push(Object.assign({ topic: tid }, w))));
+      const seenEn = new Set();
+      (tiers[tier] || []).forEach((tid) => (V[tid] || []).forEach((w) => {
+        const k = String(w.en).toLowerCase();
+        if (seenEn.has(k)) return;
+        seenEn.add(k);
+        pool.push(Object.assign({ topic: tid }, w));
+      }));
+      const norm = (x) => String(x || '').toLowerCase().trim();
       const picks = shuffle(pool).slice(0, perTier[tier]);
       picks.forEach((w) => {
-        const others = shuffle(pool.filter((x) => x.en !== w.en)).slice(0, 3);
+        // Options must be distinct in BOTH languages: two buttons reading
+        // "đánh giá" (assess / evaluate) made a right answer count as wrong.
+        const usedEn = new Set([norm(w.en)]);
+        const usedVi = new Set([norm(w.vi)]);
+        const others = [];
+        shuffle(pool).forEach((x) => {
+          if (others.length >= 3 || usedEn.has(norm(x.en)) || usedVi.has(norm(x.vi))) return;
+          usedEn.add(norm(x.en)); usedVi.add(norm(x.vi));
+          others.push(x);
+        });
         out.push({ tier, word: w, options: shuffle([w].concat(others)) });
       });
     });
@@ -411,6 +442,9 @@
       listening = false;
     }
 
+    // Teardown when the student leaves by ANY route (nav bar, device Back).
+    if (global.App && App.onLeave) App.onLeave(() => { stopAsr(); });
+
     function renderSpeaking() {
       if (!prompts.length || idx >= prompts.length) return finish();
       const pr = prompts[idx];
@@ -451,7 +485,10 @@
             ta.value = (committed + interim).trim();
           };
           recognition.onend = () => { listening = false; syncMic(); };
-          recognition.onerror = () => { listening = false; syncMic(); };
+          recognition.onerror = (e) => {
+            listening = false; syncMic();
+            if (e && (e.error === 'not-allowed' || e.error === 'service-not-allowed')) App.toast('🎤 ' + t('iv.micDenied'));
+          };
           try { recognition.start(); listening = true; } catch (e) { listening = false; }
           syncMic();
         });
@@ -547,5 +584,6 @@
 
   global.Placement = {
     start, levelFor, generateRoadmap, roadmapStatus, describeItem, toggleManual, Schedule, DAY_KEYS,
+    __buildVocab: buildVocabQuestions, // exposed for QC
   };
 })(window);

@@ -10,7 +10,7 @@
   --body-on-dark: #ffffff;
   --body-muted: #cccccc;
   --ink-muted-80: #333333;
-  --ink-muted-48: #7a7a7a;
+  --ink-muted-48: #6e6e73; /* ≥4.5:1 on white and on #f5f5f7 (WCAG AA) */
   --divider-soft: #f0f0f0;
   --hairline: #e0e0e0;
   --canvas: #ffffff;
@@ -1119,10 +1119,6 @@ input[type="text"]:focus { border-color: var(--primary); }
 .review-item.box-2 { border-left-color: var(--warning); }
 
 @media (max-width: 600px) {
-  .progress-table th:nth-child(3),
-  .progress-table td:nth-child(3),
-  .progress-table th:nth-child(5),
-  .progress-table td:nth-child(5) { display: none; }
   .progress-table .mini-bar { width: 60px; }
 }
 
@@ -1685,11 +1681,22 @@ input[type="text"]:focus { border-color: var(--primary); }
 
 /* ===== Responsive ===== */
 @media (max-width: 700px) {
-  .app-header { padding: 10px 14px; gap: 6px; }
+  /* Two rows on phones: [logo … account/voice/lang] then a scrollable nav
+     strip, so sign-out and language never fall off-screen. */
+  .app-header { padding: 8px 12px; gap: 6px; flex-wrap: wrap; }
+  .brand { order: 1; }
+  .header-right { order: 2; margin-left: auto; gap: 6px; }
+  .main-nav {
+    order: 3; width: 100%; gap: 4px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .main-nav::-webkit-scrollbar { display: none; }
+  .nav-btn { padding: 6px 10px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
   .brand-name { display: none; }
-  .main-nav { gap: 2px; }
-  .nav-btn { padding: 6px 8px; font-size: 12px; }
   .profile-name { display: none; }
+  .profile-chip { padding: 4px 6px; gap: 4px; }
+  /* Wide tables scroll sideways instead of stretching the page. */
+  .progress-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .app-main { padding: 16px; }
   h1 { font-size: 22px; }
   .quiz-options { grid-template-columns: 1fr; }

@@ -15,6 +15,13 @@
   //   allowGcal: boolean,                              // false for the demo account
   // }
 
+  // Local calendar date (Vietnam is UTC+7: toISOString() gives YESTERDAY
+  // between 00:00 and 07:00).
+  function localYmd(d) {
+    const x = d instanceof Date ? d : new Date(d);
+    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  }
+
   function esc(str) {
     return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -42,6 +49,25 @@
   }
 
   const DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+  // Run a write with its button disabled, so a double-click can't record a
+  // payment / group twice or toggle an attendance record back off.
+  async function busy(btn, fn) {
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+    try { await fn(); } finally { if (btn && btn.isConnected) btn.disabled = false; }
+  }
+
+  // Keep /groups/{gid}/members and each student's plan.groupId in step.
+  async function setGroupMember(ctx, gid, uid, isMember) {
+    const g = gid && ctx.data.groups[gid];
+    if (!g) return;
+    const members = Object.assign({}, g.members || {});
+    if (isMember) members[uid] = true; else delete members[uid];
+    const next = Object.assign({}, g, { members });
+    await ctx.api.saveGroup(gid, next);
+    ctx.data.groups[gid] = next;
+  }
 
   const DAY_MS = 86400000;
 
@@ -110,22 +136,27 @@
   // clickable to change it.
   function renderOverview(students, billing, groups, selMonth) {
     const now = new Date();
-    const curKey = now.toISOString().slice(0, 7);
+    const curKey = localYmd(now).slice(0, 7);
     const monthKeyOf = (y, m) => y + '-' + String(m + 1).padStart(2, '0');
 
     const byMonth = {};
     let totalIncome = 0;
     let taughtUnpaid = 0;
     let configured = 0;
+    // Income counts EVERY payment on record (also students with no plan any
+    // more or accounts no longer in /users) so both blocks below agree.
+    Object.values(billing || {}).forEach((b) => {
+      Object.values((b && b.payments) || {}).forEach((p) => {
+        const amt = Number(p.amount) || 0;
+        totalIncome += amt;
+        const k = String(p.date || '').slice(0, 7);
+        if (k) byMonth[k] = (byMonth[k] || 0) + amt;
+      });
+    });
     students.forEach((s) => {
       const b = billing[s.id];
       if (!b || !b.plan) return;
       configured += 1;
-      Object.values(b.payments || {}).forEach((p) => {
-        totalIncome += p.amount || 0;
-        const k = (p.date || '').slice(0, 7);
-        if (k) byMonth[k] = (byMonth[k] || 0) + (p.amount || 0);
-      });
       const rem = Billing.remaining(b);
       if (rem < 0) {
         const ep = Billing.effectivePlan(b, groups);
@@ -142,7 +173,7 @@
     let newThisMonth = 0;
     students.forEach((s) => {
       const c = s.profile && s.profile.createdAt;
-      if (c && new Date(c).toISOString().slice(0, 7) === curKey) newThisMonth += 1;
+      if (c && localYmd(c).slice(0, 7) === curKey) newThisMonth += 1;
     });
 
     const months = [];
@@ -171,13 +202,14 @@
     let selIncome = 0;
     let selSessions = 0;
     const selPayments = [];
-    students.forEach((s) => {
-      const b = billing[s.id];
+    Object.entries(billing || {}).forEach(([uid, b]) => {
       if (!b) return;
+      const s = byId[uid];
       Object.values(b.payments || {}).forEach((p) => {
-        if ((p.date || '').slice(0, 7) === sel) {
-          selIncome += p.amount || 0;
-          selPayments.push({ name: studentName(s), date: p.date, sessions: p.sessions || 0, amount: p.amount || 0, note: p.note || '' });
+        if (String(p.date || '').slice(0, 7) === sel) {
+          const amt = Number(p.amount) || 0;
+          selIncome += amt;
+          selPayments.push({ name: s ? studentName(s) : uid, date: p.date, sessions: Number(p.sessions) || 0, amount: amt, note: p.note || '' });
         }
       });
       Object.entries(b.attendance || {}).forEach(([date, a]) => {
@@ -188,7 +220,7 @@
     let selNew = 0;
     students.forEach((s) => {
       const c = s.profile && s.profile.createdAt;
-      if (c && new Date(c).toISOString().slice(0, 7) === sel) selNew += 1;
+      if (c && localYmd(c).slice(0, 7) === sel) selNew += 1;
     });
     const selParts = sel.split('-');
     const selLabel = 'T' + parseInt(selParts[1], 10) + '/' + selParts[0];
@@ -597,11 +629,19 @@
         const duration = parseInt(m.el.querySelector('#durInput').value, 10) || Billing.DEFAULT_DURATION;
         newPlan = { type: '1v1', ratePerSession: rate, packageSize: custom > 0 ? custom : pkg, duration };
       }
-      try {
-        await api.saveStudentPlan(uid, newPlan, type === 'group' ? {} : sched);
-        m.close();
-        await ctx.reload();
-      } catch (e) { App.toast('❌ ' + (e && e.message || 'error')); }
+      const btn = m.el.querySelector('#savePlanBtn');
+      await busy(btn, async () => {
+        try {
+          const oldGid = plan.type === 'group' ? plan.groupId : null;
+          const newGid = newPlan.type === 'group' ? newPlan.groupId : null;
+          await api.saveStudentPlan(uid, newPlan, type === 'group' ? {} : sched);
+          // Leaving / switching group → update both groups' member lists.
+          if (oldGid && oldGid !== newGid) await setGroupMember(ctx, oldGid, uid, false);
+          if (newGid && newGid !== oldGid) await setGroupMember(ctx, newGid, uid, true);
+          m.close();
+          await ctx.reload();
+        } catch (e) { App.toast('❌ ' + (e && e.message || 'error')); }
+      });
     });
   }
 
@@ -616,7 +656,7 @@
     const paid = Billing.paidSessions(b);
     const used = Billing.usedSessions(b);
     const suggestedAmount = (ep.ratePerSession || 0) * (ep.packageSize || 8);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localYmd(new Date());
 
     const historyRows = Object.entries(b.payments || {})
       .sort((a, x) => (x[1].ts || 0) - (a[1].ts || 0))
@@ -650,23 +690,27 @@
     `);
 
     m.el.querySelectorAll('[data-close]').forEach((x) => x.addEventListener('click', m.close));
-    m.el.querySelector('#addPayBtn').addEventListener('click', async () => {
+    m.el.querySelector('#addPayBtn').addEventListener('click', async (ev) => {
+      if (ev.currentTarget.disabled) return;
+      ev.currentTarget.disabled = true;
+      const payBtn = ev.currentTarget;
       const sessions = parseInt(String(m.el.querySelector('#paySessions').value).replace(/\D/g, ''), 10) || 0;
       const amount = parseInt(String(m.el.querySelector('#payAmount').value).replace(/\D/g, ''), 10) || 0;
-      if (!sessions) { App.toast(t('bill.needSessions')); return; }
+      if (!sessions) { payBtn.disabled = false; App.toast(t('bill.needSessions')); return; }
       try {
         await api.addPayment(uid, {
-          date: m.el.querySelector('#payDate').value || new Date().toISOString().slice(0, 10),
+          date: m.el.querySelector('#payDate').value || localYmd(new Date()),
           sessions,
           amount,
           note: m.el.querySelector('#payNote').value || '',
         });
         m.close();
         await ctx.reload();
-      } catch (e) { App.toast('❌ ' + (e && e.message || 'error')); }
+      } catch (e) { payBtn.disabled = false; App.toast('❌ ' + (e && e.message || 'error')); }
     });
     m.el.querySelectorAll('[data-del]').forEach((btn) => {
       btn.addEventListener('click', async () => {
+        if (!confirm(t('bill.confirmDeletePayment'))) return;
         try {
           await api.deletePayment(uid, btn.getAttribute('data-del'));
           m.close();
@@ -810,21 +854,36 @@
       const rate = parseInt(String(m.el.querySelector('#gRate').value).replace(/\D/g, ''), 10) || 0;
       const pkg = parseInt(String(m.el.querySelector('#gPkg').value).replace(/\D/g, ''), 10) || 8;
       const duration = parseInt(m.el.querySelector('#gDur').value, 10) || Billing.DEFAULT_DURATION;
-      try {
-        const savedGid = await api.saveGroup(gid, { name, ratePerSession: rate, packageSize: pkg, duration, schedule: sched, members });
-        // Point every member's plan at this group.
-        for (const uid of Object.keys(members)) {
-          await api.saveStudentPlan(uid, { type: 'group', groupId: savedGid }, undefined);
-        }
-        m.close();
-        await ctx.reload();
-      } catch (e) { App.toast('❌ ' + (e && e.message || 'error')); }
+      await busy(m.el.querySelector('#saveGroupBtn'), async () => {
+        try {
+          const savedGid = await api.saveGroup(gid, { name, ratePerSession: rate, packageSize: pkg, duration, schedule: sched, members });
+          ctx.data.groups[savedGid] = { name, ratePerSession: rate, packageSize: pkg, duration, schedule: sched, members };
+          // Point every member's plan at this group (and out of any other group).
+          for (const uid of Object.keys(members)) {
+            const cur = (data.billing[uid] || {}).plan;
+            if (cur && cur.type === 'group' && cur.groupId && cur.groupId !== savedGid) await setGroupMember(ctx, cur.groupId, uid, false);
+            await api.saveStudentPlan(uid, { type: 'group', groupId: savedGid }, undefined);
+          }
+          // Unticked members still pointing here go back to "chưa cấu hình".
+          for (const uid of Object.keys(g.members || {})) {
+            const cur = (data.billing[uid] || {}).plan;
+            if (!members[uid] && cur && cur.type === 'group' && cur.groupId === gid) await api.saveStudentPlan(uid, null, undefined);
+          }
+          m.close();
+          await ctx.reload();
+        } catch (e) { App.toast('❌ ' + (e && e.message || 'error')); }
+      });
     });
     const delBtn = m.el.querySelector('#delGroupBtn');
     if (delBtn) {
       delBtn.addEventListener('click', async () => {
         if (!confirm(t('bill.confirmDeleteGroup'))) return;
         try {
+          // Members must not keep pointing at a deleted group (they'd show as
+          // 0đ "1-1" and vanish from attendance).
+          for (const [uid, b] of Object.entries(data.billing || {})) {
+            if (b && b.plan && b.plan.type === 'group' && b.plan.groupId === gid) await api.saveStudentPlan(uid, null, undefined);
+          }
           await api.deleteGroup(gid);
           m.close();
           await ctx.reload();
@@ -874,7 +933,7 @@
   function renderAttendanceTab(container, ctx) {
     const { students, data, api, lang } = ctx;
     const { billing, groups, settings } = data;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localYmd(new Date());
     let date = container.__attDate || today;
 
     const paint = () => {
@@ -967,8 +1026,11 @@
         if (!uid) return;
         const b = billing[uid] || {};
         const planType = b.plan ? b.plan.type : '1v1';
-        await api.markAttendance(uid, date, 'present', planType, settings);
-        await ctx.reload('attendance');
+        e.target.disabled = true;
+        try {
+          await api.markAttendance(uid, date, 'present', planType, settings);
+          await ctx.reload('attendance');
+        } catch (e2) { e.target.disabled = false; App.toast('❌ ' + (e2 && e2.message || 'error')); }
       });
       container.querySelectorAll('.att-btn').forEach((btn) => {
         btn.addEventListener('click', async () => {
@@ -976,10 +1038,18 @@
           const st = btn.getAttribute('data-st');
           const b = billing[uid] || {};
           const planType = b.plan ? b.plan.type : '1v1';
+          // Lock the whole row: a fast double-click used to delete the record
+          // it had just written (same status = toggle off).
+          const rowBtns = container.querySelectorAll('.att-btn[data-uid="' + uid + '"]');
+          if (btn.disabled) return;
+          rowBtns.forEach((x) => { x.disabled = true; });
           try {
             await api.markAttendance(uid, date, st, planType, settings);
             await ctx.reload('attendance');
-          } catch (e2) { App.toast('❌ ' + (e2 && e2.message || 'error')); }
+          } catch (e2) {
+            rowBtns.forEach((x) => { x.disabled = false; });
+            App.toast('❌ ' + (e2 && e2.message || 'error'));
+          }
         });
       });
     };

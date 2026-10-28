@@ -6,6 +6,11 @@ Rules** and Publish. It adds the tuition nodes (`/billing`, `/groups`,
 
 Access summary:
 
+- `/users/{uid}/profile/email` must equal the signed-in account's email and
+  `updatedAt` / `createdAt` cannot be in the future, so a student cannot
+  impersonate a classmate (e.g. to be picked as "the account to keep" when
+  the teacher merges duplicates) or pin themselves to the top of the roster.
+
 - `/users/{uid}` — student reads/writes own row; teachers read all.
 - `/billing/{uid}` — student **reads own** (fee-reminder banner + attendance
   history); only teachers write. Students can never edit sessions or money.
@@ -23,7 +28,13 @@ Access summary:
       ".read": "auth != null && root.child('teachers').child(auth.uid).val() == true",
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('teachers').child(auth.uid).val() == true)",
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && auth.uid == $uid",
+        "profile": {
+          "email": { ".validate": "newData.isString() && newData.val() == auth.token.email" },
+          "name": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "createdAt": { ".validate": "newData.isNumber() && newData.val() <= now" }
+        },
+        "updatedAt": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" }
       }
     },
     "billing": {

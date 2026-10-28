@@ -436,7 +436,9 @@
   ];
 
   // Filler words penalized by the fluency criterion.
-  const FILLERS = ['um', 'uh', 'er', 'like', 'you know', 'actually', 'basically'];
+  // Only true hesitation fillers: "I like people" / "actually" are normal
+  // English and used to lower the fluency score.
+  const FILLERS = ['um', 'uh', 'er', 'erm', 'hmm', 'you know', 'basically'];
 
   global.INTERVIEW_BANK = {
     questions: B,

@@ -16,14 +16,64 @@
     ));
   }
 
+  let currentParams = null;
+
+  // Views register teardown (mic, timers, document listeners) here; it runs
+  // on every navigation, whatever button or Back gesture caused it.
+  const leaveHandlers = [];
+  function onLeave(fn) { if (typeof fn === 'function') leaveHandlers.push(fn); }
+  function runLeaveHandlers() {
+    while (leaveHandlers.length) {
+      const fn = leaveHandlers.pop();
+      try { fn(); } catch (e) { console.warn('[app] leave handler failed', e); }
+    }
+  }
+
+  // Local calendar date (Vietnam is UTC+7: toISOString() gives YESTERDAY
+  // between 00:00 and 07:00).
+  function localYmd(d) {
+    const x = d instanceof Date ? d : new Date(d);
+    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  }
+
   function navigate(view, params, opts) {
+    const o = opts || {};
+    const fb = typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled();
+    // Auth guard: signed-in users never see the sign-in form (e.g. via
+    // Back), signed-out users never see app views.
+    if (fb) {
+      const signedIn = !!FirebaseSync.getCurrentUser();
+      if (signedIn && view === 'profile') { view = 'topics'; params = null; }
+      else if (!signedIn && view !== 'profile') { view = 'profile'; params = null; }
+    } else if (view !== 'profile' && !Storage.getActiveProfileId()) {
+      view = 'profile'; params = null;
+    }
+    // Interview is per-student gated; roadmap links and Back must respect it.
+    if (view === 'interview' && fb && !o.accessOk && typeof InterviewAccess !== 'undefined') {
+      const u = FirebaseSync.getCurrentUser();
+      InterviewAccess.isEnabledFor(u).then((ok) => {
+        if (ok) navigate('interview', params, Object.assign({}, o, { accessOk: true }));
+        else {
+          toast('🔒 ' + I18N.t('iv.locked'));
+          if (o.fromPop || !currentView) navigate('topics', null, { fromPop: true });
+        }
+      });
+      return;
+    }
+
+    runLeaveHandlers();
     currentView = view;
+    currentParams = params || null;
     // Push a browser-history entry so the device/browser Back button walks
     // back through in-app views instead of leaving the app. When the call
     // itself came from a popstate (Back), don't push again.
-    if (!(opts && opts.fromPop) && typeof history !== 'undefined') {
-      try { history.pushState({ view: view, params: params || null }, ''); } catch (e) {}
+    if (typeof history !== 'undefined') {
+      try {
+        if (o.replace) history.replaceState({ view: view, params: params || null }, '');
+        else if (!o.fromPop) history.pushState({ view: view, params: params || null }, '');
+      } catch (e) {}
     }
+    if (view === 'game') currentToeicContext = (params && params.toeicContext) || null;
     renderHeader();
     highlightNav(view);
     switch (view) {
@@ -313,13 +363,18 @@
     const game = getGameModule(mode);
     if (!game) return exitTarget();
 
+    // Distractors / same-meaning answers come from the whole topic (or TOEIC
+    // part), not just the review list — a 1-word review used to make every
+    // quiz question single-option.
+    const pool = toeicContext ? words : ((VOCAB[topicId] && VOCAB[topicId].length) ? VOCAB[topicId] : words);
+    const reviewWords = (!toeicContext && wordsOverride && wordsOverride.length) ? wordsOverride : null;
     game.start({
       container: appEl,
       topicId,
       words: sessionWords,
-      allTopicWords: words,
+      allTopicWords: pool,
       onExit: exitTarget,
-      onFinish: (result) => handleFinish(Object.assign({ mode, topicId, toeicContext }, result)),
+      onFinish: (result) => handleFinish(Object.assign({ mode, topicId, toeicContext, reviewWords }, result)),
     });
   }
 
@@ -401,6 +456,10 @@
           wordsOverride: TOEIC.allWordsInPart(result.toeicContext.editionId, result.toeicContext.partId),
           toeicContext: result.toeicContext,
         });
+      } else if (result.reviewWords) {
+        // "Play again" on a review round reviews the words still wrong.
+        const left = SRS.wrongWords(Storage.getProgress(), result.topicId, VOCAB[result.topicId] || []);
+        navigate('game', left.length ? { topicId: result.topicId, mode: result.mode, wordsOverride: left } : { topicId: result.topicId, mode: result.mode });
       } else {
         navigate('game', { topicId: result.topicId, mode: result.mode });
       }
@@ -536,10 +595,10 @@
     for (let i = 29; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const ds = d.toISOString().slice(0, 10);
+      const ds = localYmd(d);
       const v = histByDate[ds] || 0;
       const h = Math.round((v / maxVal) * 100);
-      bars.push(`<div class="history-bar" style="height:${Math.max(h, v ? 8 : 2)}%;opacity:${v ? 1 : 0.15}" data-tip="${ds}: ${v}"></div>`);
+      bars.push(`<div class="history-bar" style="height:${Math.max(h, v ? 8 : 2)}%;opacity:${v ? 1 : 0.15}" data-tip="${ds}: ${Number(v) || 0}"></div>`);
     }
 
     // Badges
@@ -586,7 +645,7 @@
           <div class="stat-card">
             <div class="label">${t('progress.xp')}</div>
             <div class="value">${stats.xp}</div>
-            <div class="hint">Total XP earned</div>
+            <div class="hint">${t('progress.totalXpHint')}</div>
           </div>
           <div class="stat-card">
             <div class="label">${t('progress.streak')}</div>
@@ -664,6 +723,17 @@
       reader.onload = (ev) => {
         try {
           const data = JSON.parse(ev.target.result);
+          const u = (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) ? FirebaseSync.getCurrentUser() : null;
+          if (u) {
+            // Signed in: fold the file into THIS account so it syncs, instead
+            // of creating a local-only profile that disappears on reload.
+            if (!data || !data.progress) throw new Error('Invalid data');
+            const merged = mergeProgress(Storage.getProgress(u.uid), Storage.normalizeProgress(data.progress));
+            Storage.saveProgress(merged, u.uid);
+            toast('✅ ' + I18N.t('progress.importMerged'));
+            navigate('progress', null, { fromPop: true });
+            return;
+          }
           const p = Storage.importProfile(data);
           Storage.setActiveProfile(p.id);
           toast('Imported: ' + p.name);
@@ -1043,7 +1113,17 @@
     const part = TOEIC.PARTS.find((p) => p.id === partId);
     if (!ed || !part) return navigate('toeic');
 
-    const { highFreq, keywords } = TOEIC.getPart(editionId, partId);
+    const raw = TOEIC.getPart(editionId, partId);
+    // The source lists repeat some words (e.g. "receipt" twice in 2023 Part 3);
+    // show each word once, keyword group first — same set the games use.
+    const seenEn = new Set();
+    const uniq = (arr) => (arr || []).filter((w) => {
+      const k = String(w.en || '').toLowerCase().trim();
+      if (!k || seenEn.has(k)) return false;
+      seenEn.add(k); return true;
+    });
+    const keywords = uniq(raw.keywords);
+    const highFreq = uniq(raw.highFreq);
     const allWords = TOEIC.allWordsInPart(editionId, partId);
     const virtualTopicId = toeicTopicId(editionId, partId);
     const progress = Storage.getProgress();
@@ -1179,13 +1259,18 @@
       </section>
     `;
 
+    // Each tab load gets a token; a slower, older load must not paint over
+    // the tab the teacher has switched to since.
+    let loadToken = 0;
     const loadList = async () => {
+      const my = ++loadToken;
       const content = appEl.querySelector('#classContent');
       content.innerHTML = `<div class="empty-state" style="padding:30px 20px;">${t('class.loading')}</div>`;
       // Demo accounts see a fabricated roster — never real student data.
       const demoUser = FirebaseSync.getCurrentUser();
       if (typeof DemoSeed !== 'undefined' && DemoSeed.isDemoUser(demoUser) && !FirebaseSync.isTeacher(demoUser)) {
         lastStudents = DemoSeed.listDemoStudents();
+        if (my !== loadToken) return;
         paintList(lastStudents);
         const note = document.createElement('div');
         note.style.cssText = 'margin-top:10px;font-size:12px;color:var(--text-muted);';
@@ -1194,6 +1279,7 @@
         return;
       }
       const result = await FirebaseSync.listAllStudents();
+      if (my !== loadToken) return;
       lastStudents = result.students || [];
       lastMergedCount = result.mergedCount || 0;
       if (result.error === 'permission-denied') {
@@ -1201,9 +1287,9 @@
         content.style.padding = '30px 20px';
         content.innerHTML = `
           <div style="font-size:40px;margin-bottom:8px;">🔒</div>
-          <h2 style="margin:0 0 6px;">Permission denied</h2>
+          <h2 style="margin:0 0 6px;">${t('class.permDeniedTitle')}</h2>
           <p style="color:var(--text-muted);max-width:580px;margin:0 auto 12px;line-height:1.5;">
-            Rules Firebase đang chặn. Cần update rules để teacher được đọc <code>/users</code>:
+            ${t('class.permDeniedBody')}
           </p>
           <pre style="text-align:left;background:var(--bg-soft);padding:14px;border-radius:10px;font-size:12px;max-width:600px;margin:0 auto;overflow:auto;">${t('class.fixRulesSample')}</pre>
         `;
@@ -1212,13 +1298,13 @@
       if (result.error === 'timeout') {
         content.className = 'empty-state';
         content.style.padding = '30px 20px';
-        content.innerHTML = `⏱️ Database read timed out. Check databaseURL region in js/firebase-config.js.`;
+        content.innerHTML = '⏱️ ' + t('class.readTimeout');
         return;
       }
       if (result.error === 'not-teacher') {
         content.className = 'empty-state';
         content.style.padding = '30px 20px';
-        content.innerHTML = `Chỉ giáo viên mới xem được. Email hiện tại không có trong TEACHER_EMAILS.`;
+        content.innerHTML = t('class.notTeacher');
         return;
       }
       paintList(lastStudents);
@@ -1246,14 +1332,16 @@
         const wordsSeen = Object.keys(p.perWord || {}).length;
         let mastered = 0;
         Object.values(p.perWord || {}).forEach((w) => { if (w.box >= 4) mastered += 1; });
-        const streak = p.streak || 0;
-        const xp = p.xp || 0;
-        const level = p.level || 1;
-        const lastMs = s.updatedAt || 0;
+        const streak = Progress.effectiveStreak(p);
+        // Students can write anything into their own row: coerce every
+        // number shown on the teacher's screen (stored-XSS hardening).
+        const xp = Number(p.xp) || 0;
+        const level = Number(p.level) || 1;
+        const lastMs = Number(s.updatedAt) || 0;
         const insights = (typeof ClassInsights !== 'undefined')
           ? ClassInsights.analyze(s, lang)
           : { accuracy: null, riskLevel: 'ok', riskScore: 0, suggestions: [], weakTopics: [], stuckWords: [], inactiveDays: null };
-        const createdMs = (s.profile && s.profile.createdAt) || 0;
+        const createdMs = Number(s.profile && s.profile.createdAt) || 0;
         return { s, p, wordsSeen, mastered, streak, xp, level, lastMs, createdMs, insights };
       });
 
@@ -1399,6 +1487,7 @@
     };
 
     const loadBillingTab = async (kind) => {
+      const my = ++loadToken;
       const content = appEl.querySelector('#classContent');
       content.className = '';
       content.style.padding = '0';
@@ -1407,20 +1496,24 @@
       let students;
       let api;
       let data;
+      let rosterOk = true;
       if (isDemoView()) {
         students = DemoSeed.listDemoStudents();
+        lastStudents = students;
         api = DemoSeed.getDemoBillingApi();
         data = await api.fetchAll();
       } else {
-        if (!lastStudents.length) {
-          const result = await FirebaseSync.listAllStudents();
-          lastStudents = result.students || [];
-        }
+        // Always refetch: new signups must appear in "Chưa cấu hình" on ↻.
+        const result = await FirebaseSync.listAllStudents();
+        if (my !== loadToken) return;
+        rosterOk = !result.error;
+        if (rosterOk) lastStudents = result.students || [];
         students = lastStudents;
         api = Billing;
         try {
           data = await Billing.fetchAll();
         } catch (e) {
+          if (my !== loadToken) return;
           content.className = 'empty-state';
           content.style.padding = '30px 20px';
           content.innerHTML = `🔒 ${t('bill.rulesMissing')}`;
@@ -1435,6 +1528,8 @@
       // through reload(), so pushing to Google Calendar here keeps it exact.
       const gcalAfterWrite = () => {
         if (!allowGcal || !GCal.configured() || !GCal.isConnected()) return;
+        // Never sync from a failed/empty roster: it would delete every event.
+        if (!rosterOk || !ctx.students.length) return;
         GCal.autoSync(ctx, (err, r) => {
           const msg = content.querySelector('#gcalMsg');
           if (err && GCal.isAuthError(err)) toast('📅 ' + t('gcal.needAuth'));
@@ -1458,6 +1553,7 @@
           if (!(opts && opts.skipGcal)) gcalAfterWrite();
         },
       };
+      if (my !== loadToken) return;
       if (kind === 'billing') BillingUI.renderBillingTab(content, ctx);
       else BillingUI.renderAttendanceTab(content, ctx);
       // Opening the tab: refresh the calendar if the last push is stale
@@ -1504,7 +1600,7 @@
           <tbody>${insights.weakTopics.map((w) => `
             <tr>
               <td>${w.icon} ${escapeHtml(w.title[lang] || w.title.vi)}</td>
-              <td class="num">${w.attempts}</td>
+              <td class="num">${Number(w.attempts) || 0}</td>
               <td class="num ${w.accuracy < 50 ? 'acc-bad' : 'acc-warn'}">${w.accuracy}%</td>
             </tr>`).join('')}
           </tbody>
@@ -1514,7 +1610,7 @@
     const stuck = insights.stuckWords.slice(0, 16);
     const stuckHtml = stuck.length
       ? `<div class="stuck-list">${stuck.map((w) =>
-          `<span class="stuck-pill">${w.icon} ${escapeHtml(w.en)} <em>✗${w.wrong}</em></span>`).join('')}</div>`
+          `<span class="stuck-pill">${w.icon} ${escapeHtml(w.en)} <em>✗${Number(w.wrong) || 0}</em></span>`).join('')}</div>`
       : `<div class="muted-note">${t('class.noStuckWords')}</div>`;
 
     // 14-day activity bars from history.
@@ -1528,10 +1624,10 @@
     for (let i = 13; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const ds = d.toISOString().slice(0, 10);
+      const ds = localYmd(d);
       const v = byDate[ds] || 0;
       const h = Math.round((v / maxV) * 100);
-      bars.push(`<div class="history-bar" style="height:${Math.max(h, v ? 8 : 2)}%;opacity:${v ? 1 : 0.15}" data-tip="${ds}: ${v}"></div>`);
+      bars.push(`<div class="history-bar" style="height:${Math.max(h, v ? 8 : 2)}%;opacity:${v ? 1 : 0.15}" data-tip="${ds}: ${Number(v) || 0}"></div>`);
     }
 
     const backdrop = document.createElement('div');
@@ -1550,7 +1646,7 @@
           ${chip(t('class.streak'), '🔥 ' + streak)}
           ${chip(t('class.accuracyCol'), insights.accuracy == null ? '—' : insights.accuracy + '%')}
           ${chip(t('class.mastered'), mastered + '/' + wordsSeen)}
-          ${p.placement ? chip(t('pl.levelShort'), p.placement.level + ' · TOEIC ' + p.placement.toeic) : ''}
+          ${p.placement ? chip(t('pl.levelShort'), escapeHtml(p.placement.level) + ' · TOEIC ' + escapeHtml(p.placement.toeic)) : ''}
         </div>
         ${renderTeacherPlanRow(p, lang)}
         <label class="member-row" id="ivFlagRow" hidden style="border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
@@ -1631,13 +1727,14 @@
         csvCell(s.profile && s.profile.email || ''),
         p.level || 1,
         p.xp || 0,
-        p.streak || 0,
+        Progress.effectiveStreak(p),
         wordsSeen,
         mastered,
         s.updatedAt ? new Date(s.updatedAt).toISOString() : '',
       ].join(','));
     });
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    // BOM so Excel opens Vietnamese names as UTF-8 instead of mojibake.
+    const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1649,7 +1746,10 @@
   }
 
   function csvCell(v) {
-    const s = String(v == null ? '' : v).replace(/"/g, '""');
+    let s = String(v == null ? '' : v);
+    // A name like "=HYPERLINK(...)" must stay text in Excel/Sheets.
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    s = s.replace(/"/g, '""');
     return /[,"\n]/.test(s) ? '"' + s + '"' : s;
   }
 
@@ -1674,7 +1774,11 @@
     langBtn.addEventListener('click', () => {
       I18N.toggle();
       syncVoiceLabel();
-      if (currentView) navigate(currentView);
+      // Re-render the same screen with its params. Live sessions (a game,
+      // test, interview, drill) keep going: re-rendering would restart them.
+      const live = ['game', 'placement', 'interview', 'drill'];
+      if (currentView && live.indexOf(currentView) < 0) navigate(currentView, currentParams, { fromPop: true });
+      else renderHeader();
     });
 
     function syncVoiceLabel() {
@@ -1812,13 +1916,13 @@
           syncClassNav();
           syncInterviewNav();
           if (typeof Placement !== 'undefined') Placement.Schedule.startInPageNotifier();
-          if (currentView === 'profile' || !currentView) navigate('topics');
+          if (currentView === 'profile' || !currentView) navigate('topics', null, { replace: true });
           hydrateLocalFromCloud(user).catch((e) => console.warn('[app] hydrate error', e));
         } else {
           Storage.setActiveProfile(null);
           syncClassNav();
           syncInterviewNav();
-          navigate('profile');
+          navigate('profile', null, { replace: true });
         }
       });
     }
@@ -1830,7 +1934,13 @@
     // out to a blank page.
     window.addEventListener('popstate', (e) => {
       const st = e.state;
-      if (st && st.view) {
+      if (st && st.view === 'game' && st.params) {
+        // Back onto a finished/abandoned game must not start a new session:
+        // land on that game's topic (or TOEIC part) instead.
+        const gp = st.params;
+        if (gp.toeicContext) navigate('toeic-part', { editionId: gp.toeicContext.editionId, partId: gp.toeicContext.partId }, { fromPop: true, replace: true });
+        else navigate('topic', { topicId: gp.topicId }, { fromPop: true, replace: true });
+      } else if (st && st.view) {
         navigate(st.view, st.params, { fromPop: true });
       } else {
         const home = (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()
@@ -1841,13 +1951,15 @@
 
     // Initial route
     const hasActive = Storage.getActiveProfileId() && Storage.getActiveProfile();
+    // replace: the first screen must not leave an extra history entry
+    // (Back from Topics used to show the sign-in form).
     if (typeof FirebaseSync !== 'undefined' && FirebaseSync.enabled()) {
       // Wait for onAuthChange; default to auth screen meanwhile.
-      navigate('profile');
+      navigate('profile', null, { replace: true });
     } else if (!hasActive) {
-      navigate('profile');
+      navigate('profile', null, { replace: true });
     } else {
-      navigate('topics');
+      navigate('topics', null, { replace: true });
     }
   }
 
@@ -1855,11 +1967,15 @@
     const profiles = Storage.getProfiles();
     let localProfile = profiles.find((p) => p.id === user.uid);
     if (!localProfile) {
+      // Just signed up on this device → use what was typed on the form.
+      const pending = FirebaseSync.takePendingSignup ? FirebaseSync.takePendingSignup(user.email) : null;
       localProfile = {
         id: user.uid,
-        name: user.displayName || (user.email || '').split('@')[0] || 'Me',
-        avatar: '🙂',
-        createdAt: Date.now(),
+        name: (pending && pending.name) || user.displayName || (user.email || '').split('@')[0] || 'Me',
+        avatar: (pending && pending.avatar) || '🙂',
+        // Only a brand-new signup knows its creation time; otherwise the
+        // cloud value is copied in by hydrateLocalFromCloud.
+        createdAt: pending ? pending.createdAt : null,
       };
       profiles.push(localProfile);
       localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
@@ -1867,46 +1983,52 @@
     return localProfile;
   }
 
-  async function hydrateLocalFromCloud(user) {
-    // Pulls cloud state and merges onto the local profile. Runs in the
-    // background after the view has already swapped to 'topics', so a
-    // slow/failing DB read never blocks the UI.
+  // Pulls cloud state and merges it into the local profile, in the
+  // background after the view already switched to 'topics'. A FAILED read
+  // (slow 3G, timeout) is retried and uploads stay blocked until it
+  // succeeds — a failure is never treated as "empty account".
+  async function hydrateLocalFromCloud(user, attempt) {
+    const tries = attempt || 0;
+    const stillMe = () => { const u = FirebaseSync.getCurrentUser(); return !!u && u.uid === user.uid; };
     let data = null;
     try {
       data = await FirebaseSync.pullCurrentUser();
     } catch (e) {
-      console.warn('[app] pullCurrentUser failed — keeping local state', e);
+      console.warn('[app] cloud read failed (attempt ' + (tries + 1) + ') — retrying', e);
+      if (tries === 1) toast('☁️ ' + I18N.t('sync.retrying'));
+      if (stillMe()) setTimeout(() => hydrateLocalFromCloud(user, tries + 1).catch(() => {}), Math.min(60000, 3000 * Math.pow(2, tries)));
       return;
     }
-    if (!data) return; // First signin or DB empty — keep local state.
+    if (!stillMe()) return;
 
-    const cloudProfile = data.profile || {};
-    const cloudProgress = data.progress || null;
-
-    // Update profile metadata from cloud (name/avatar may have changed
-    // on another device).
-    const profiles = Storage.getProfiles();
-    const localProfile = profiles.find((p) => p.id === user.uid);
-    if (localProfile) {
-      if (cloudProfile.name) localProfile.name = cloudProfile.name;
-      if (cloudProfile.avatar) localProfile.avatar = cloudProfile.avatar;
-      localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
-    }
-
-    // Merge progress field-by-field. A winner-takes-all comparison on XP
-    // silently dropped the smaller side's perWord/history when both devices
-    // had studied; union-merging keeps every word's best state instead.
-    if (cloudProgress) {
-      const localProgress = Storage.getProgress(user.uid);
-      const merged = mergeProgress(localProgress, Storage.normalizeProgress(cloudProgress));
-      localStorage.setItem('vlt_progress_' + user.uid, JSON.stringify(merged));
-      if ((merged.xp || 0) > (cloudProgress.xp || 0)) {
-        // Local contributed something cloud lacked — push the merge back up.
-        FirebaseSync.scheduleProgressPush();
+    if (data) {
+      const cloudProfile = data.profile || {};
+      // Profile metadata from cloud (name/avatar may have changed on another
+      // device; createdAt = the ORIGINAL signup time, keep the earliest).
+      const profiles = Storage.getProfiles();
+      const localProfile = profiles.find((p) => p.id === user.uid);
+      if (localProfile) {
+        if (cloudProfile.name) localProfile.name = cloudProfile.name;
+        if (cloudProfile.avatar) localProfile.avatar = cloudProfile.avatar;
+        const c = [localProfile.createdAt, cloudProfile.createdAt].filter((x) => typeof x === 'number' && x > 0);
+        if (c.length) localProfile.createdAt = Math.min.apply(null, c);
+        localStorage.setItem('vlt_profiles', JSON.stringify(profiles));
+      }
+      // Union-merge progress field by field (every word keeps its best state).
+      if (data.progress) {
+        const merged = mergeProgress(Storage.getProgress(user.uid), Storage.normalizeProgress(data.progress));
+        Storage.saveProgressLocal(merged, user.uid);
       }
     }
     await applyAccountMerges(user);
+    if (!stillMe()) return;
+    // Uploads allowed from now on; this also pushes anything only this
+    // device had (read-merge-write in FirebaseSync.pushActiveProfile).
+    FirebaseSync.markHydrated(user.uid);
     renderHeader();
+    // Show the merged numbers on the screen the student is looking at.
+    const refreshable = ['topics', 'progress', 'topic', 'toeic', 'toeic-part'];
+    if (refreshable.indexOf(currentView) >= 0) navigate(currentView, currentParams, { fromPop: true });
   }
 
   // The teacher merged an old (duplicate) account into this one: fold its
@@ -1914,7 +2036,9 @@
   // second device never applies the same merge twice.
   async function applyAccountMerges(user) {
     if (!FirebaseSync.pullMerges) return;
-    const merges = await FirebaseSync.pullMerges();
+    const merges = await FirebaseSync.pullMerges(user.uid);
+    const u = FirebaseSync.getCurrentUser();
+    if (!u || u.uid !== user.uid) return; // switched accounts meanwhile
     if (!merges) return;
     let p = Storage.getProgress(user.uid);
     let changed = false;
@@ -1932,84 +2056,13 @@
       changed = true;
     });
     if (!changed) return;
-    Storage.saveProgress(p, user.uid); // also schedules the cloud push
+    Storage.saveProgress(p, user.uid); // pushed once hydration completes
     toast('🔗 ' + I18N.t('acc.mergedToast'));
-    if (currentView === 'topics' || currentView === 'progress') navigate(currentView, null, { fromPop: true });
   }
 
-  function mergeProgress(a, b) {
-    const out = Storage.emptyProgress();
-    out.xp = Math.max(a.xp || 0, b.xp || 0);
-    out.level = Math.max(a.level || 1, b.level || 1);
-    out.streak = Math.max(a.streak || 0, b.streak || 0);
-    out.lastActiveDate = [a.lastActiveDate, b.lastActiveDate].filter(Boolean).sort().pop() || null;
-    out.badges = Array.from(new Set([].concat(a.badges || [], b.badges || [])));
-    // Placement / roadmap / schedule: newest wins (roadmap keeps manual
-    // ticks from both sides when it's the same roadmap).
-    const newer = (x, y, key) => ((y && y[key]) || 0) > ((x && x[key]) || 0) ? y : x;
-    out.placement = newer(a.placement, b.placement, 'takenAt') || undefined;
-    // Per-track placements: newest per track.
-    const pk = new Set([].concat(Object.keys(a.placements || {}), Object.keys(b.placements || {})));
-    if (pk.size) {
-      out.placements = {};
-      pk.forEach((k) => { out.placements[k] = newer((a.placements || {})[k], (b.placements || {})[k], 'takenAt'); });
-    }
-    const rm = newer(a.roadmap, b.roadmap, 'createdAt');
-    if (rm) {
-      out.roadmap = JSON.parse(JSON.stringify(rm));
-      if (a.roadmap && b.roadmap && a.roadmap.createdAt === b.roadmap.createdAt) {
-        out.roadmap.manual = Object.assign({}, a.roadmap.manual || {}, b.roadmap.manual || {});
-      }
-    }
-    out.schedule = newer(a.schedule, b.schedule, 'updatedAt') || undefined;
-    if (out.placement === undefined) delete out.placement;
-    if (out.schedule === undefined) delete out.schedule;
-    // Account merges already applied (uid → merge timestamp), max per key.
-    const mf = Object.assign({}, a.mergedFrom || {});
-    Object.keys(b.mergedFrom || {}).forEach((k) => { mf[k] = Math.max(mf[k] || 0, b.mergedFrom[k] || 0); });
-    if (Object.keys(mf).length) out.mergedFrom = mf;
-
-    const wordKeys = new Set([].concat(Object.keys(a.perWord || {}), Object.keys(b.perWord || {})));
-    wordKeys.forEach((k) => {
-      const wa = (a.perWord || {})[k];
-      const wb = (b.perWord || {})[k];
-      if (!wa) { out.perWord[k] = wb; return; }
-      if (!wb) { out.perWord[k] = wa; return; }
-      out.perWord[k] = {
-        box: Math.max(wa.box || 1, wb.box || 1),
-        correct: Math.max(wa.correct || 0, wb.correct || 0),
-        wrong: Math.max(wa.wrong || 0, wb.wrong || 0),
-        lastReviewed: Math.max(wa.lastReviewed || 0, wb.lastReviewed || 0),
-      };
-    });
-
-    const topicKeys = new Set([].concat(Object.keys(a.perTopic || {}), Object.keys(b.perTopic || {})));
-    topicKeys.forEach((k) => {
-      const ta = (a.perTopic || {})[k];
-      const tb = (b.perTopic || {})[k];
-      if (!ta) { out.perTopic[k] = tb; return; }
-      if (!tb) { out.perTopic[k] = ta; return; }
-      out.perTopic[k] = {
-        attempts: Math.max(ta.attempts || 0, tb.attempts || 0),
-        correct: Math.max(ta.correct || 0, tb.correct || 0),
-        wrong: Math.max(ta.wrong || 0, tb.wrong || 0),
-        lastPlayedAt: Math.max(ta.lastPlayedAt || 0, tb.lastPlayedAt || 0),
-        lastTestedAt: Math.max(ta.lastTestedAt || 0, tb.lastTestedAt || 0),
-      };
-    });
-
-    const seenTs = new Set();
-    out.history = [].concat(a.history || [], b.history || [])
-      .filter((h) => {
-        if (!h || seenTs.has(h.ts)) return false;
-        seenTs.add(h.ts);
-        return true;
-      })
-      .sort((x, y) => (x.ts || 0) - (y.ts || 0))
-      .slice(-300);
-
-    return out;
-  }
+  // Field-by-field union of two progress objects (lives in Storage so the
+  // cloud sync can merge before every upload).
+  function mergeProgress(a, b) { return Storage.mergeProgress(a, b); }
 
   // Show the ✈️ Phỏng vấn nav item only for accounts with the feature
   // flag (or teacher / demo, handled inside InterviewAccess).
@@ -2042,6 +2095,6 @@
     classBtn.hidden = !showClass;
   }
 
-  global.App = { navigate, toast, renderHeader };
+  global.App = { navigate, toast, renderHeader, onLeave };
   document.addEventListener('DOMContentLoaded', boot);
 })(window);

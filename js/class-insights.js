@@ -98,7 +98,8 @@
       else if (accuracy < 65) risk += 25;
     }
     risk += Math.min(20, stuckWords.length * 2);
-    if ((p.streak || 0) === 0 && hasActivity) risk += 10;
+    const streakNow = (global.Progress && Progress.effectiveStreak) ? Progress.effectiveStreak(p) : (p.streak || 0);
+    if (streakNow === 0 && hasActivity) risk += 10;
 
     // Missed scheduled sessions this week (student set a study schedule).
     let missedSched = null;
@@ -138,10 +139,10 @@
           ? 'Chưa học ' + inactiveDays + ' ngày — nhắn nhắc nhé'
           : 'Inactive for ' + inactiveDays + ' days — send a nudge');
       }
-    } else if (forStudent && (p.streak || 0) > 0 && inactiveDays != null && inactiveDays >= 1) {
+    } else if (forStudent && streakNow > 0 && inactiveDays != null && inactiveDays >= 1) {
       suggestions.push(L === 'vi'
-        ? '🔥 Học 1 phiên hôm nay để giữ chuỗi ' + p.streak + ' ngày!'
-        : '🔥 Do one session today to keep your ' + p.streak + '-day streak!');
+        ? '🔥 Học 1 phiên hôm nay để giữ chuỗi ' + streakNow + ' ngày!'
+        : '🔥 Do one session today to keep your ' + streakNow + '-day streak!');
     }
     if (stuckWords.length >= 5) {
       if (forStudent) {

@@ -169,7 +169,10 @@
     const d = db();
     if (!d) throw new Error('offline');
     if (!gid) {
-      const ref = d.ref('groups').push(data);
+      // push() then await set(): a rules/validation error must reach the UI
+      // before member plans are pointed at a group that was never saved.
+      const ref = d.ref('groups').push();
+      await ref.set(data);
       return ref.key;
     }
     await d.ref('groups/' + gid).set(data);

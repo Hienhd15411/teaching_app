@@ -1,0 +1,7 @@
+# Firebase database exports contain student emails/progress — never commit.
+*-rtdb-export.json
+*rtdb-export*.json
+firebase-export*.json
+# QC run output
+qc/last-run.json
+node_modules/

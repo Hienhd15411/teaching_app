@@ -73,6 +73,9 @@
     if (!enabled()) throw new Error('Firebase not configured');
     init();
     console.log('[FirebaseSync] signUp:', email);
+    // onAuthStateChanged fires before this function resumes; remember the
+    // chosen name/avatar so the local profile isn't named after the email.
+    pendingSignup = { email: String(email).toLowerCase().trim(), name: displayName, avatar: avatar, createdAt: Date.now() };
     const cred = await withTimeout(
       auth.createUserWithEmailAndPassword(email, password),
       8000,
@@ -120,8 +123,23 @@
     return cred.user;
   }
 
+  // Name/avatar typed on the sign-up form (consumed once by app.js).
+  let pendingSignup = null;
+  function takePendingSignup(email) {
+    const p = pendingSignup;
+    if (p && email && p.email === String(email).toLowerCase().trim()) { pendingSignup = null; return p; }
+    return null;
+  }
+
   async function signOut() {
     if (!enabled() || !auth) return;
+    // Upload anything still waiting on the debounce before the user goes.
+    if (pendingPush) {
+      clearTimeout(pendingPush);
+      pendingPush = null;
+      try { await withTimeout(pushActiveProfile(), 4000, 'Final push'); } catch (e) {}
+    }
+    hydratedUid = null;
     await auth.signOut();
   }
 
@@ -149,10 +167,11 @@
 
   // Student side: progress handed over from accounts the teacher merged
   // into this one (see js/accounts.js). Null when none / rules missing.
-  async function pullMerges() {
-    if (!enabled() || !currentUser) return null;
+  async function pullMerges(uid) {
+    const id = uid || (currentUser && currentUser.uid);
+    if (!enabled() || !id) return null;
     try {
-      const snap = await withTimeout(db.ref('merges/' + currentUser.uid).once('value'), 4000, 'Merges read');
+      const snap = await withTimeout(db.ref('merges/' + id).once('value'), 4000, 'Merges read');
       return snap.val();
     } catch (e) {
       return null;
@@ -160,20 +179,28 @@
   }
 
   // --- Sync ---
+  // Returns the cloud row, or null when the account has no row yet.
+  // THROWS on timeout/permission errors: callers must not mistake a failed
+  // read for an empty account (that used to let a fresh device overwrite
+  // months of cloud progress).
   async function pullCurrentUser() {
     if (!enabled() || !currentUser) return null;
-    try {
-      const snap = await withTimeout(
-        db.ref('users/' + currentUser.uid).once('value'),
-        4000,
-        'Database read'
-      );
-      return snap.val();
-    } catch (e) {
-      console.warn('[FirebaseSync] pull failed', e);
-      return null;
-    }
+    const snap = await withTimeout(
+      db.ref('users/' + currentUser.uid).once('value'),
+      8000,
+      'Database read'
+    );
+    return snap.val();
   }
+
+  // Uploads stay blocked until app.js has merged the cloud copy into the
+  // local one for this uid (markHydrated).
+  let hydratedUid = null;
+  function markHydrated(uid) {
+    hydratedUid = uid;
+    scheduleProgressPush();
+  }
+  function isHydrated() { return !!currentUser && hydratedUid === currentUser.uid; }
 
   let pendingPush = null;
   function scheduleProgressPush() {
@@ -185,28 +212,49 @@
     }, 1500);
   }
 
+  // Read-merge-write: another device may have uploaded newer work since
+  // this tab last synced, so the cloud copy is merged in (and saved
+  // locally) before uploading. Never runs before the first successful pull.
+  let pushing = false;
   async function pushActiveProfile() {
     if (!enabled() || !currentUser) return;
+    if (!isHydrated()) return;
+    if (pushing) { scheduleProgressPush(); return; }
+    const uid = currentUser.uid;
     const profile = Storage.getActiveProfile();
-    if (!profile || profile.id !== currentUser.uid) return;
-    const progress = Storage.getProgress(profile.id);
+    if (!profile || profile.id !== uid) return;
+    pushing = true;
     try {
+      const snap = await withTimeout(db.ref('users/' + uid).once('value'), 8000, 'Pre-push read');
+      if (!currentUser || currentUser.uid !== uid) return; // signed out meanwhile
+      const cloud = snap.val() || {};
+      const local = Storage.getProgress(uid);
+      const merged = cloud.progress
+        ? Storage.mergeProgress(local, Storage.normalizeProgress(cloud.progress))
+        : local;
+      Storage.saveProgressLocal(merged, uid);
+      const cloudProfile = cloud.profile || {};
+      const createdAt = Math.min(profile.createdAt || Infinity, cloudProfile.createdAt || Infinity);
       const update = {
-        'profile/id': profile.id,
-        'profile/name': profile.name,
+        'profile/id': uid,
+        'profile/name': profile.name || cloudProfile.name || '',
         'profile/email': currentUser.email || '',
-        'profile/avatar': profile.avatar || '🙂',
-        progress: progress,
+        'profile/avatar': profile.avatar || cloudProfile.avatar || '🙂',
+        progress: merged,
         updatedAt: firebase.database.ServerValue.TIMESTAMP,
       };
-      // Only write createdAt when the local profile actually has one —
-      // otherwise every push resets the cloud's original signup timestamp.
-      if (profile.createdAt) update['profile/createdAt'] = profile.createdAt;
-      await db.ref('users/' + currentUser.uid).update(update);
+      // Keep the ORIGINAL signup time (roster sorts by first login).
+      if (createdAt !== Infinity) update['profile/createdAt'] = createdAt;
+      await db.ref('users/' + uid).update(update);
     } catch (e) {
-      console.warn('[FirebaseSync] push failed', e);
+      console.warn('[FirebaseSync] push failed, will retry', e);
+      if (pushRetry) clearTimeout(pushRetry);
+      pushRetry = setTimeout(() => { pushRetry = null; scheduleProgressPush(); }, 15000);
+    } finally {
+      pushing = false;
     }
   }
+  let pushRetry = null;
 
   // --- Teacher read ---
   async function listAllStudents() {
@@ -231,13 +279,20 @@
         const m = (await withTimeout(db.ref('merges').once('value'), 4000, 'Merges read')).val() || {};
         Object.keys(m).forEach((keep) => Object.keys(m[keep] || {}).forEach((old) => { mergedAway[old] = keep; }));
       } catch (e) { mergedAway = {}; /* rules not updated yet → show everything */ }
-      const students = Object.keys(val).filter((id) => !mergedAway[id]).map((id) => ({
+      // Teacher and sales-demo accounts are not students: keep them out of
+      // the roster, counts, billing and calendar.
+      const demoEmails = (global.DEMO_ACCOUNTS || []).map((e) => String(e).toLowerCase().trim());
+      const notStudent = (id) => {
+        const em = String(((val[id] || {}).profile || {}).email || '').toLowerCase().trim();
+        return !!em && (teacherEmails.indexOf(em) >= 0 || demoEmails.indexOf(em) >= 0);
+      };
+      const students = Object.keys(val).filter((id) => !mergedAway[id] && !notStudent(id)).map((id) => ({
         id,
         profile: val[id].profile || { id, name: id },
         progress: val[id].progress || Storage.emptyProgress(),
         updatedAt: val[id].updatedAt || 0,
       }));
-      const hiddenCount = Object.keys(val).length - students.length;
+      const hiddenCount = Object.keys(mergedAway).filter((id) => val[id]).length;
       console.log('[FirebaseSync] listAllStudents ok, ' + students.length + ' students (' + hiddenCount + ' merged)');
       return { students, error: null, mergedCount: hiddenCount };
     } catch (e) {
@@ -262,6 +317,9 @@
     sendPasswordReset,
     pullMerges,
     pullCurrentUser,
+    markHydrated,
+    isHydrated,
+    takePendingSignup,
     scheduleProgressPush,
     pushActiveProfile,
     listAllStudents,

@@ -10,13 +10,28 @@
     return a;
   }
 
+  // One round never holds two words with the same Vietnamese meaning
+  // ("rẻ" = cheap / affordable): the two cards would look identical.
+  function pickRound(words, n) {
+    const out = [];
+    const seen = new Set();
+    shuffle(words).forEach((w) => {
+      const k = String(w.vi || '').toLowerCase().trim();
+      if (out.length < n && !seen.has(k)) { seen.add(k); out.push(w); }
+    });
+    return out;
+  }
+
   function start(opts) {
     const { container, topicId, words, onExit, onFinish } = opts;
     const t = I18N.t;
 
     // Use up to 6 pairs per round to keep grid playable.
     const PAIR_COUNT = Math.min(6, words.length);
-    const roundWords = shuffle(words).slice(0, PAIR_COUNT);
+    const roundWords = pickRound(words, PAIR_COUNT);
+    let left = false;
+    let finishTimer = null;
+    if (global.App && App.onLeave) App.onLeave(() => { left = true; if (finishTimer) clearTimeout(finishTimer); });
 
     let matchedCount = 0;
     let correct = 0;
@@ -109,7 +124,7 @@
         Storage.saveProgress(progress);
         updateHud();
         if (matchedCount >= roundWords.length) {
-          setTimeout(finish, 500);
+          finishTimer = setTimeout(() => { if (!left) finish(); }, 500);
         }
       } else {
         // wrong
@@ -123,7 +138,9 @@
         const prev = selectedEl;
         selectedEl = null;
         setTimeout(() => {
-          prev.node.classList.remove('wrong', 'selected');
+          prev.node.classList.remove('wrong');
+          // The student may have tapped this card again during the flash.
+          if (!selectedEl || selectedEl.node !== prev.node) prev.node.classList.remove('selected');
           node.classList.remove('wrong');
           updateHud();
         }, 600);

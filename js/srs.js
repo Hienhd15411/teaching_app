@@ -6,8 +6,10 @@
 
   const MAX_BOX = 5;
 
+  // Firebase RTDB keys may not contain . # $ [ ] / — one bad key ("Fill
+  // out/in") makes the whole progress upload fail, so they become "_".
   function wordKey(topicId, en) {
-    return topicId + '::' + en.toLowerCase();
+    return (topicId + '::' + String(en).toLowerCase()).replace(/[.#$\[\]\/]/g, '_');
   }
 
   function getWordState(progress, topicId, en) {

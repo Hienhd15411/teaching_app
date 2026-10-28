@@ -329,7 +329,9 @@
         await api('GET', '/calendars/' + encodeURIComponent(id), null, tokenStr);
         return id;
       } catch (e) {
-        if (e.status !== 404 && e.status !== 403) throw e;
+        // Only 404 means "calendar gone". 403 is usually a rate/usage limit:
+        // recreating would orphan the real calendar and duplicate events.
+        if (e.status !== 404) throw e;
         id = null; // teacher deleted it → recreate
       }
     }
@@ -405,7 +407,12 @@
 
   // ctx = { students, data:{billing,groups,settings}, lang }
   async function sync(ctx, opts) {
-    if (syncing) return syncing;
+    if (syncing) {
+      // A write landed while a sync from older data is running: run once
+      // more with the newest ctx when it finishes.
+      dirtyCtx = ctx;
+      return syncing;
+    }
     syncing = (async () => {
       const interactive = !!(opts && opts.interactive);
       const tokenStr = await getAccessToken(interactive);
@@ -454,8 +461,16 @@
       lastResult = { at, count: desired.size, stats, calId };
       return lastResult;
     })();
-    try { return await syncing; } finally { syncing = null; }
+    try { return await syncing; } finally {
+      syncing = null;
+      if (dirtyCtx) {
+        const next = dirtyCtx;
+        dirtyCtx = null;
+        setTimeout(() => { sync(next, { interactive: false }).catch(() => {}); }, 0);
+      }
+    }
   }
+  let dirtyCtx = null;
 
   async function connect(ctx) {
     const r = await sync(ctx, { interactive: true });

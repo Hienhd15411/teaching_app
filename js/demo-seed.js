@@ -30,7 +30,7 @@
   }
 
   function ymd(d) {
-    return d.toISOString().slice(0, 10);
+    return localYmd(d);
   }
 
   function buildSeed() {
@@ -110,6 +110,13 @@
       p.schedule = { days: ['tue', 'thu', 'sat'], time: '20:00', minutes: 20, remind: true, updatedAt: now - 12 * day };
     }
     return p;
+  }
+
+  // Local calendar date (Vietnam is UTC+7: toISOString() gives YESTERDAY
+  // between 00:00 and 07:00).
+  function localYmd(d) {
+    const x = d instanceof Date ? d : new Date(d);
+    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
   }
 
   function isDemoUser(user) {

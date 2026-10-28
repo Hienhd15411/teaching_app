@@ -49,7 +49,7 @@
         { en: 'Please switch off your mobile phone.', ipa: 'pliːz swɪtʃ ɒf jɔː ˈməʊbaɪl fəʊn', vi: 'Xin tắt điện thoại di động.' },
         { en: 'Cabin crew, prepare for take-off.', ipa: 'ˈkæbɪn kruː prɪˈpeə fə ˈteɪkɒf', vi: 'Tổ tiếp viên chuẩn bị cất cánh.' },
         { en: 'We will be landing shortly.', ipa: 'wiː wɪl biː ˈlændɪŋ ˈʃɔːtli', vi: 'Chúng ta sắp hạ cánh.' },
-        { en: 'The local time is ten o clock.', ipa: 'ðə ˈləʊkl taɪm ɪz ten əˈklɒk', vi: 'Giờ địa phương là mười giờ.' },
+        { en: "The local time is ten o'clock.", ipa: 'ðə ˈləʊkl taɪm ɪz ten əˈklɒk', vi: 'Giờ địa phương là mười giờ.' },
         { en: 'Please keep your seatbelt fastened.', ipa: 'pliːz kiːp jɔː ˈsiːtbelt ˈfɑːsnd', vi: 'Xin giữ dây an toàn luôn cài.' },
         { en: 'We are experiencing some turbulence.', ipa: 'wiː ɑːr ɪkˈspɪəriənsɪŋ sʌm ˈtɜːbjələns', vi: 'Chúng ta đang gặp nhiễu động.' },
         { en: 'Please return your seat to the upright position.', ipa: 'pliːz rɪˈtɜːn jɔː siːt tə ði ˈʌpraɪt pəˈzɪʃn', vi: 'Xin dựng thẳng lưng ghế.' },

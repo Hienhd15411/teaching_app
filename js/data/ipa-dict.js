@@ -71,5 +71,8 @@
     journey: 'ˈdʒɜːni', trip: 'trɪp', travel: 'ˈtrævl', arrive: 'əˈraɪv', depart: 'dɪˈpɑːt',
     experience: 'ɪkˈspɪəriəns', confident: 'ˈkɒnfɪdənt', friendly: 'ˈfrendli', person: 'ˈpɜːsn',
     people: 'ˈpiːpl', pleasure: 'ˈpleʒə', comfortable: 'ˈkʌmftəbl', pleasant: 'ˈpleznt',
+    // cabin-service words used in the drill sets
+    oclock: 'əˈklɒk', clock: 'klɒk', 'duty-free': 'ˌdjuːti ˈfriː', duty: 'ˈdjuːti', free: 'friː',
+    trolley: 'ˈtrɒli', coming: 'ˈkʌmɪŋ', come: 'kʌm',
   };
 })(window);
