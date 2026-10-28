@@ -66,6 +66,7 @@
   const RECENT_WINDOW_MS = DAY_MS; // "just learned" = touched in the last 24h
   // Modes that teach new words. Every other mode is a test of learned words.
   const LEARN_MODES = { flashcard: true };
+  const MIN_LEARNED_FOR_TEST = 4;
 
   // ≥ 1 means due. Box 1 (wrong / struggling) is always due.
   function dueRatio(s, now) {
@@ -145,7 +146,10 @@
         .sort((a, b) => (b.s.lastReviewed || 0) - (a.s.lastReviewed || 0));
       recent.forEach((x) => ordered.push(x.w));
       seen.slice().sort(byDue).forEach((x) => ordered.push(x.w));
-      unseen.forEach((x) => ordered.push(x.w));
+      // Only top up with never-studied words when almost nothing is learned
+      // yet; otherwise a half-finished learning round produced a "test" full
+      // of words the student had never seen.
+      if (seen.length < MIN_LEARNED_FOR_TEST) unseen.forEach((x) => ordered.push(x.w));
     }
 
     const picked = [];
@@ -160,6 +164,39 @@
   }
 
   function isLearnMode(mode) { return !!LEARN_MODES[mode]; }
+
+  // ---------- parts (Học theo phần) ----------
+  //
+  // A list is cut into fixed parts of CHUNK_SIZE words in list order
+  // (78 words → 7 parts of 10 + 1 of 8). A part session always uses exactly
+  // its own words, whatever the student did before.
+
+  const CHUNK_SIZE = 10;
+
+  function chunkWords(words, size) {
+    const n = size || CHUNK_SIZE;
+    const out = [];
+    for (let i = 0; i < words.length; i += n) {
+      out.push({ index: out.length, start: i + 1, end: Math.min(words.length, i + n), words: words.slice(i, i + n) });
+    }
+    return out;
+  }
+
+  // Firebase turns {"0":…,"1":…} into an array, so part keys are "c0", "c1"…
+  function chunkKey(index) { return 'c' + index; }
+
+  // { learned, total, test: {correct,total,at}|null, state: new|learning|learned|tested|mastered }
+  function chunkStatus(progress, topicId, chunk) {
+    let learned = 0;
+    chunk.words.forEach((w) => { if (progress.perWord[wordKey(topicId, w.en)]) learned += 1; });
+    const pt = (progress.perTopic && progress.perTopic[topicId]) || {};
+    const test = (pt.chunkTests && pt.chunkTests[chunkKey(chunk.index)]) || null;
+    const total = chunk.words.length;
+    let state = 'new';
+    if (learned > 0) state = learned < total ? 'learning' : 'learned';
+    if (test) state = test.correct >= Math.ceil(test.total * 0.8) ? 'mastered' : 'tested';
+    return { learned, total, test, state };
+  }
 
   function wrongWords(progress, topicId, words) {
     return words.filter((w) => {
@@ -179,6 +216,10 @@
     wordStatus,
     learnStatus,
     isLearnMode,
+    CHUNK_SIZE,
+    chunkWords,
+    chunkKey,
+    chunkStatus,
     dueRatio,
   };
 })(window);

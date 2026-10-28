@@ -93,6 +93,16 @@
     // Marks the end of a test so the next test stops prioritising words
     // that were "just learned" before this one (see SRS.pickSession).
     if (typeof SRS !== 'undefined' && !SRS.isLearnMode(result.mode)) t.lastTestedAt = t.lastPlayedAt;
+    // Part test ("Kiểm tra" on a 10-word part): keep its latest score.
+    if (typeof SRS !== 'undefined' && result.chunk != null && !SRS.isLearnMode(result.mode)) {
+      t.chunkTests = t.chunkTests || {};
+      t.chunkTests[SRS.chunkKey(result.chunk)] = {
+        correct: result.correct || 0,
+        total: (result.correct || 0) + (result.wrong || 0) + (result.close || 0),
+        mode: result.mode,
+        at: t.lastPlayedAt,
+      };
+    }
     progress.perTopic[result.topicId] = t;
 
     // history (last 60 entries)

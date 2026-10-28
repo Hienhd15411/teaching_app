@@ -288,6 +288,55 @@ module.exports = async function runE2E() {
     await finishPage(page, 'TOEIC');
   });
 
+  // =============== 4b. Học theo phần (ETS 2026 · Part 1, 78 từ) ===============
+  await safe('chunks', async () => {
+    area('Học viên: học theo phần');
+    const page = await openApp({ user: STUDENT, data: { users: {} } });
+    await nav(page, 'toeic-part', { editionId: '2026', partId: 'part1' });
+    await page.waitForTimeout(250);
+    const all = await page.evaluate(() => TOEIC.allWordsInPart('2026', 'part1').map((w) => w.en));
+    const cards = await page.locator('.chunk-card').count();
+    check(cards === Math.ceil(all.length / 10), 'Trang Part hiện ' + cards + ' phần cho ' + all.length + ' từ');
+    check(/Phần 1/.test(await text(page, '.chunk-card.current')), 'Phần gợi ý hiện tại là Phần 1');
+    // Learn part 2 (words 11–20)
+    await page.click('[data-chunk="1"][data-cmode="flashcard"]');
+    await page.waitForTimeout(150);
+    const seenCards = [];
+    for (let i = 0; i < 12 && !(await page.locator('.game-result').count()); i++) {
+      seenCards.push((await text(page, '.big-word')).replace('🔊', '').trim());
+      await page.click('#card'); await page.click('#good'); await page.waitForTimeout(60);
+    }
+    const want = all.slice(10, 20);
+    check(seenCards.length === 10 && seenCards.every((w) => want.indexOf(w) >= 0), 'Học Phần 2 → đúng 10 từ số 11–20', seenCards.join(', '));
+    check(/Kiểm tra phần 2/.test(await text(page, '#partNextBtn')), 'Học xong → nút "Kiểm tra phần 2"');
+    await page.click('#partNextBtn');
+    await page.waitForTimeout(150);
+    const asked = await page.evaluate(() => { const q = document.querySelector('.quiz-question, .quiz-prompt, .game-view'); return q ? q.textContent : ''; });
+    // Answer every question correctly by matching data-en against the part.
+    let qn = 0;
+    const askedWords = [];
+    for (let i = 0; i < 40 && !(await page.locator('.game-result').count()); i++) {
+      if (await page.locator('#nextBtn').count()) { await page.click('#nextBtn'); continue; }
+      const opts = await page.locator('.quiz-option').evaluateAll((els) => els.map((e) => e.getAttribute('data-en')));
+      if (!opts.length) { await page.waitForTimeout(100); continue; }
+      const hit = opts.find((e) => want.indexOf(e) >= 0 && !askedWords.includes(e) && opts.filter((x) => want.indexOf(x) >= 0).length === 1) || opts.find((e) => want.indexOf(e) >= 0);
+      askedWords.push(hit);
+      await page.locator('.quiz-option[data-en="' + hit.replace(/"/g, '\\"') + '"]').first().click();
+      qn += 1;
+      await page.waitForTimeout(80);
+    }
+    void asked;
+    check(qn === 10, 'Kiểm tra Phần 2 hỏi đủ 10 câu', String(qn));
+    const rec = await page.evaluate(() => ((Storage.getProgress().perTopic.toeic_2026_part1 || {}).chunkTests || {}).c1 || null);
+    check(rec && rec.total === 10, 'Lưu kết quả kiểm tra Phần 2 (' + (rec ? rec.correct + '/' + rec.total : '—') + ')');
+    await page.click('#backToTopicBtn');
+    await page.waitForTimeout(200);
+    const chip = await text(page, '.chunk-card:nth-child(2) .chunk-chip');
+    check(/Đạt|Kiểm tra/.test(chip), 'Thẻ Phần 2 hiện kết quả kiểm tra: ' + chip.trim());
+    check(/^1$/.test((await text(page, '.word-num')).trim()), 'Danh sách từ có số thứ tự khớp với các phần');
+    await finishPage(page, 'Học theo phần');
+  });
+
   // =============== 5. Phỏng vấn + luyện phát âm ===============
   await safe('interview', async () => {
     area('Phỏng vấn tiếp viên & luyện IPA');

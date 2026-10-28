@@ -22,7 +22,7 @@ TZ=Asia/Ho_Chi_Minh node qc/run.js
 node qc/run.js --unit
 
 # chỉ một kịch bản (tên có chứa chữ này): auth, student, placement, toeic,
-# interview, teacher, demo, mobile, sync, switch
+# chunks, interview, teacher, demo, mobile, sync, switch
 QC_ONLY=teacher node qc/run.js
 ```
 
@@ -34,6 +34,7 @@ Kết quả in theo từng khu vực (✅/❌) và lưu vào `qc/last-run.json`.
 | Dữ liệu từ vựng / TOEIC | Mọi chủ đề có từ, không trùng, IPA + ví dụ ≥ 95%, mọi bộ đề × Part mở được |
 | Ngôn ngữ VI/EN | Không có chuỗi nào thiếu bản dịch (kể cả lúc chạy thật) |
 | Chọn từ học / kiểm tra | Học mới đi lần lượt 1–10, 11–20; kiểm tra hỏi đúng từ vừa học |
+| Học theo phần | 78 từ → 8 phần; Học/Kiểm tra đúng 10 từ của phần; lưu điểm từng phần |
 | Học phí & điểm danh | 1-1 vắng không trừ, nhóm vắng trừ; còn lại = đã đóng − đã trừ |
 | Google Calendar | Mỗi khung giờ 1 sự kiện; mỗi ngày tối đa 1 nhắc thu học phí |
 | Bài test đầu vào | Đáp án hợp lệ, phương án không trùng nghĩa, lộ trình trỏ đúng bài |
@@ -67,6 +68,7 @@ Làm sau mỗi lần thay đổi lớn, trên `https://letrinh-english.netlify.a
 
 - [ ] Đăng ký tài khoản mới bằng email gõ nhầm `@gmial.com` → app gợi ý sửa.
 - [ ] Đăng nhập → Chủ đề → Thẻ ghi nhớ 10 từ → Trắc nghiệm: hỏi đúng 10 từ vừa học.
+- [ ] TOEIC → ETS 2026 · Part 1 → "Học theo phần": Phần 2 → Học → nút "Kiểm tra phần 2" → hỏi đúng các từ số 11–20 → quay lại thấy điểm của Phần 2.
 - [ ] Đọc & Chấm: cho phép micro, đọc 1 từ → có điểm. Bấm thanh menu khi micro đang nghe → micro tắt (biểu tượng ghi âm trên tab biến mất).
 - [ ] Từ chối quyền micro → hiện hướng dẫn mở quyền.
 - [ ] Đổi VI/EN ở trang chủ đề và trang TOEIC → không lỗi, vẫn ở đúng trang.

@@ -253,8 +253,7 @@
           ${stats.mastered}/${stats.total} ${t('topics.mastered')} · ${stats.masteryPct}%
         </div>
         ${renderLearnSummary(progress, topicId, words)}
-
-        <h2 style="margin-top:24px;">${t('topic.chooseMode')}</h2>
+        ${renderChunkSection(progress, topicId, words) || `<h2 style="margin-top:24px;">${t('topic.chooseMode')}</h2>`}
         <div class="mode-grid">
           <div class="mode-card" data-mode="flashcard">
             <div class="icon">🎴</div>
@@ -292,6 +291,7 @@
     `;
 
     appEl.querySelector('#backBtn').addEventListener('click', () => navigate('topics'));
+    wireChunkSection(appEl, (chunk, mode) => navigate('game', { topicId, mode, chunk }));
     appEl.querySelectorAll('.mode-card').forEach((el) => {
       el.addEventListener('click', () => {
         navigate('game', { topicId, mode: el.getAttribute('data-mode') });
@@ -304,9 +304,52 @@
     }
 
     const wordListEl = appEl.querySelector('#wordList');
-    wordListEl.innerHTML = words.map((w) => renderWordRow(w, topicId, progress)).join('');
+    wordListEl.innerHTML = words.map((w, i) => renderWordRow(w, topicId, progress, i + 1)).join('');
     wireWordFilter(appEl);
     if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(wordListEl);
+  }
+
+  // "Học theo phần": the list cut into 10-word parts, each with Học /
+  // Kiểm tra buttons that use exactly that part's words.
+  function renderChunkSection(progress, topicId, words) {
+    const t = I18N.t;
+    const parts = SRS.chunkWords(words);
+    if (parts.length < 2) return '';
+    const chip = (st) => {
+      if (st.state === 'mastered') return `<span class="chunk-chip ok">✅ ${t('chunk.stMastered').replace('{c}', st.test.correct).replace('{t}', st.test.total)}</span>`;
+      if (st.state === 'tested') return `<span class="chunk-chip warn">📝 ${t('chunk.stTested').replace('{c}', st.test.correct).replace('{t}', st.test.total)}</span>`;
+      if (st.state === 'learned') return `<span class="chunk-chip info">📖 ${t('chunk.stLearned')}</span>`;
+      if (st.state === 'learning') return `<span class="chunk-chip info">📖 ${t('chunk.stLearning').replace('{n}', st.learned).replace('{t}', st.total)}</span>`;
+      return `<span class="chunk-chip">🆕 ${t('chunk.stNew')}</span>`;
+    };
+    // Suggest the first part that isn't passed yet.
+    const statuses = parts.map((c) => SRS.chunkStatus(progress, topicId, c));
+    const current = statuses.findIndex((st) => st.state !== 'mastered');
+    return `
+      <h2 style="margin-top:24px;">📚 ${t('chunk.title')}</h2>
+      <div class="muted-note" style="margin-bottom:10px;">${t('chunk.sub').replace('{n}', SRS.CHUNK_SIZE).replace('{p}', parts.length)}</div>
+      <div class="chunk-grid">
+        ${parts.map((c, i) => `
+          <div class="chunk-card ${i === current ? 'current' : ''}">
+            <div class="chunk-head">
+              <strong>${t('chunk.part')} ${i + 1}</strong>
+              <span class="muted-note" style="display:inline;">${t('chunk.words')} ${c.start}–${c.end}</span>
+            </div>
+            ${chip(statuses[i])}
+            <div class="chunk-btns">
+              <button class="btn ${i === current && statuses[i].state === 'new' ? '' : 'secondary'}" type="button" data-chunk="${i}" data-cmode="flashcard">🎴 ${t('chunk.learn')}</button>
+              <button class="btn ${i === current && statuses[i].state !== 'new' ? '' : 'secondary'}" type="button" data-chunk="${i}" data-cmode="quiz">❓ ${t('chunk.test')}</button>
+            </div>
+          </div>`).join('')}
+      </div>
+      <h2 style="margin-top:24px;">🎲 ${t('chunk.freeTitle')}</h2>
+      <div class="muted-note" style="margin-bottom:6px;">${t('chunk.freeSub')}</div>`;
+  }
+
+  function wireChunkSection(root, go) {
+    root.querySelectorAll('[data-chunk]').forEach((b) => b.addEventListener('click', () => {
+      go(Number(b.getAttribute('data-chunk')), b.getAttribute('data-cmode'));
+    }));
   }
 
   // "Đã học x/N · Chưa học y · Cần ôn z" + what each mode picks.
@@ -319,7 +362,7 @@
         <span class="ls-chip new">🆕 ${t('learn.unseen')} <strong>${ls.unseen}</strong></span>
         <span class="ls-chip due">🔁 ${t('learn.due')} <strong>${ls.due}</strong></span>
       </div>
-      <div class="muted-note learn-hint">${t('learn.modeHint')}</div>`;
+      ${SRS.chunkWords(words).length >= 2 ? '' : `<div class="muted-note learn-hint">${t('learn.modeHint')}</div>`}`;
   }
 
   function renderWordFilter() {
@@ -350,6 +393,7 @@
   // ========== Game runner ==========
   function renderGame(params) {
     const { topicId, mode, wordsOverride, toeicContext } = params;
+    const chunk = (params.chunk == null) ? null : Number(params.chunk);
     const words = wordsOverride && wordsOverride.length ? wordsOverride : (VOCAB[topicId] || []);
     currentToeicContext = toeicContext || null;
     const exitTarget = toeicContext
@@ -358,7 +402,22 @@
     if (!words.length) return exitTarget();
 
     const progress = Storage.getProgress();
-    const sessionWords = SRS.pickSession(progress, topicId, words.slice(), Math.min(10, words.length), mode);
+    let sessionWords;
+    if (chunk != null) {
+      // "Học theo phần": exactly this part's words — learn in list order,
+      // test in shuffled order.
+      const part = SRS.chunkWords(words)[chunk];
+      if (!part) return exitTarget();
+      sessionWords = part.words.slice();
+      if (!SRS.isLearnMode(mode)) {
+        for (let i = sessionWords.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [sessionWords[i], sessionWords[j]] = [sessionWords[j], sessionWords[i]];
+        }
+      }
+    } else {
+      sessionWords = SRS.pickSession(progress, topicId, words.slice(), Math.min(10, words.length), mode);
+    }
 
     const game = getGameModule(mode);
     if (!game) return exitTarget();
@@ -374,7 +433,7 @@
       words: sessionWords,
       allTopicWords: pool,
       onExit: exitTarget,
-      onFinish: (result) => handleFinish(Object.assign({ mode, topicId, toeicContext, reviewWords }, result)),
+      onFinish: (result) => handleFinish(Object.assign({ mode, topicId, toeicContext, reviewWords, chunk }, result)),
     });
   }
 
@@ -392,8 +451,41 @@
     renderGameResult(result, progress, newBadges);
   }
 
+  // Game params for a part of the same topic / TOEIC part.
+  function partParams(result, mode, chunk) {
+    const p = { topicId: result.topicId, mode, chunk };
+    if (result.toeicContext) {
+      p.wordsOverride = TOEIC.allWordsInPart(result.toeicContext.editionId, result.toeicContext.partId);
+      p.toeicContext = result.toeicContext;
+    }
+    return p;
+  }
+
+  // After a part session, the obvious next step: learn → test this part;
+  // test passed (≥ 80%) → learn the next part; test failed → learn it again.
+  function partNextStep(result) {
+    const t = I18N.t;
+    if (result.chunk == null) return null;
+    const words = result.toeicContext
+      ? TOEIC.allWordsInPart(result.toeicContext.editionId, result.toeicContext.partId)
+      : (VOCAB[result.topicId] || []);
+    const parts = SRS.chunkWords(words);
+    const n = result.chunk + 1;
+    if (SRS.isLearnMode(result.mode)) {
+      return { mode: 'quiz', chunk: result.chunk, label: '❓ ' + t('chunk.testThis').replace('{n}', n) };
+    }
+    const total = (result.correct || 0) + (result.wrong || 0);
+    const passed = total && (result.correct || 0) >= Math.ceil(total * 0.8);
+    if (passed && parts[result.chunk + 1]) {
+      return { mode: 'flashcard', chunk: result.chunk + 1, label: '🎴 ' + t('chunk.learnNext').replace('{n}', n + 1), note: '✅ ' + t('chunk.passed') };
+    }
+    if (passed) return { mode: 'quiz', chunk: result.chunk, label: '🔁 ' + t('chunk.testAgain'), note: '🏁 ' + t('chunk.allDone') };
+    return { mode: 'flashcard', chunk: result.chunk, label: '🎴 ' + t('chunk.relearn').replace('{n}', n), note: t('chunk.needPass') };
+  }
+
   function renderGameResult(result, progress, newBadges) {
     const t = I18N.t;
+    const partNext = partNextStep(result);
     const total = result.correct + result.wrong;
     const acc = total ? Math.round((result.correct / total) * 100) : 0;
     const dur = Math.round(result.durationSec || 0);
@@ -440,16 +532,21 @@
             <div class="stat"><div class="v">${dur}s</div><div class="l">${t('result.time')}</div></div>
           </div>
           ${badgeHtml ? `<div style="margin-top:12px;"><div style="color:var(--text-muted);font-size:12px;margin-bottom:6px;">${t('result.newBadges')}</div>${badgeHtml}</div>` : ''}
+          ${partNext ? `<div class="chunk-next">${partNext.note ? `<div class="muted-note">${partNext.note}</div>` : ''}
+            <button class="btn" id="partNextBtn">${partNext.label}</button></div>` : ''}
           <div class="btn-row" style="justify-content:center;margin-top:20px;">
             <button class="btn secondary" id="againBtn">${t('result.playAgain')}</button>
-            <button class="btn" id="backToTopicBtn">${t('result.backToTopics')}</button>
+            <button class="btn ${partNext ? 'secondary' : ''}" id="backToTopicBtn">${t('result.backToTopics')}</button>
           </div>
         </div>
       </section>
     `;
 
+    if (partNext) appEl.querySelector('#partNextBtn').addEventListener('click', () => navigate('game', partParams(result, partNext.mode, partNext.chunk)));
     appEl.querySelector('#againBtn').addEventListener('click', () => {
-      if (result.toeicContext) {
+      if (result.chunk != null) {
+        navigate('game', partParams(result, result.mode, result.chunk));
+      } else if (result.toeicContext) {
         navigate('game', {
           topicId: result.topicId,
           mode: result.mode,
@@ -1126,6 +1223,9 @@
     const highFreq = uniq(raw.highFreq);
     const allWords = TOEIC.allWordsInPart(editionId, partId);
     const virtualTopicId = toeicTopicId(editionId, partId);
+    // Word numbers match the parts ("Phần 2 · từ 11–20").
+    const numOf = {};
+    allWords.forEach((w, i) => { numOf[String(w.en).toLowerCase()] = i + 1; });
     const progress = Storage.getProgress();
     const stats = SRS.topicStats(progress, virtualTopicId, allWords);
 
@@ -1133,7 +1233,7 @@
       if (!wordArr.length) return '';
       return `
         <h3 class="group-heading">${groupLabel} <span class="count">(${wordArr.length})</span></h3>
-        <div class="word-list">${wordArr.map((w) => renderWordRow(w, virtualTopicId, progress)).join('')}</div>
+        <div class="word-list">${wordArr.map((w) => renderWordRow(w, virtualTopicId, progress, numOf[String(w.en).toLowerCase()])).join('')}</div>
       `;
     };
 
@@ -1146,8 +1246,7 @@
           ${stats.mastered}/${stats.total} ${t('topics.mastered')} · ${stats.masteryPct}%
         </div>
         ${renderLearnSummary(progress, virtualTopicId, allWords)}
-
-        <h2 style="margin-top:24px;">${t('topic.chooseMode')}</h2>
+        ${renderChunkSection(progress, virtualTopicId, allWords) || `<h2 style="margin-top:24px;">${t('topic.chooseMode')}</h2>`}
         <div class="mode-grid">
           <div class="mode-card" data-mode="flashcard">
             <div class="icon">🎴</div><div class="title">${t('mode.flashcard')}</div>
@@ -1178,6 +1277,7 @@
     `;
 
     wireWordFilter(appEl);
+    wireChunkSection(appEl, (chunk, mode) => navigate('game', { topicId: virtualTopicId, mode, chunk, wordsOverride: allWords, toeicContext: { editionId, partId } }));
     appEl.querySelector('#backBtn').addEventListener('click', () => navigate('toeic'));
     appEl.querySelectorAll('.mode-card').forEach((el) => {
       el.addEventListener('click', () => {
@@ -1192,7 +1292,7 @@
     if (typeof Pronunciation !== 'undefined') Pronunciation.bindSpeakers(appEl);
   }
 
-  function renderWordRow(w, topicId, progress) {
+  function renderWordRow(w, topicId, progress, num) {
     const rec = progress.perWord[SRS.wordKey(topicId, w.en)];
     const box = rec ? rec.box : 0; // 0 = chưa học (hollow dot)
     const status = SRS.wordStatus(progress, topicId, w.en);
@@ -1201,6 +1301,7 @@
     return `
       <div class="word-row" data-status="${status}">
         <div class="en">
+          ${num ? `<span class="word-num">${num}</span>` : ''}
           <button class="speak-btn" data-speak="${escapeHtml(w.en)}" title="${I18N.t('word.listen')}">🔊</button>
           <span class="w">${escapeHtml(w.en)}</span>
           ${w.pos ? `<span style="color:var(--text-muted);font-weight:400;font-size:12px;">(${escapeHtml(w.pos)})</span>` : ''}

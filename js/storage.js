@@ -179,6 +179,16 @@
         lastPlayedAt: Math.max(ta.lastPlayedAt || 0, tb.lastPlayedAt || 0),
         lastTestedAt: Math.max(ta.lastTestedAt || 0, tb.lastTestedAt || 0),
       };
+      // Part test scores: newest result per part wins.
+      const ck = new Set([].concat(Object.keys(ta.chunkTests || {}), Object.keys(tb.chunkTests || {})));
+      if (ck.size) {
+        out.perTopic[k].chunkTests = {};
+        ck.forEach((c) => {
+          const x = (ta.chunkTests || {})[c];
+          const y = (tb.chunkTests || {})[c];
+          out.perTopic[k].chunkTests[c] = !x ? y : !y ? x : ((y.at || 0) > (x.at || 0) ? y : x);
+        });
+      }
     });
 
     const seenTs = new Set();

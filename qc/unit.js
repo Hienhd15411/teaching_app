@@ -333,4 +333,35 @@ module.exports = async function runUnit() {
     }
     check(!!C.Placement.__buildVocab && dupOpt === 0, 'Bài test: 4 phương án luôn khác nghĩa nhau', String(dupOpt));
   });
+
+  // ---------------- Học theo phần ----------------
+  await safe('chunks', async () => {
+    area('Học theo phần');
+    const S = C.SRS;
+    const all = C.TOEIC.allWordsInPart('2026', 'part1');
+    const T = 'toeic_2026_part1';
+    const parts = S.chunkWords(all);
+    check(parts.length === Math.ceil(all.length / 10) && parts[0].words.length === 10 && parts[parts.length - 1].end === all.length, 'Chia ' + all.length + ' từ thành ' + parts.length + ' phần × 10 (phần cuối ' + parts[parts.length - 1].words.length + ' từ)');
+    check(parts.every((c, i) => c.start === i * 10 + 1), 'Số thứ tự từ của mỗi phần đúng (1–10, 11–20…)');
+    const p = C.Storage.normalizeProgress({});
+    check(S.chunkStatus(p, T, parts[1]).state === 'new', 'Phần chưa học → "Chưa học"');
+    parts[1].words.slice(0, 4).forEach((w) => { p.perWord[S.wordKey(T, w.en)] = { box: 2, correct: 1, wrong: 0, lastReviewed: Date.now() }; });
+    check(S.chunkStatus(p, T, parts[1]).state === 'learning' && S.chunkStatus(p, T, parts[1]).learned === 4, 'Học dở 4/10 → "Đang học 4/10"');
+    // Free-mode test after a half-finished round: only the learned words.
+    const q = S.pickSession(p, T, all.slice(), 10, 'quiz');
+    check(q.length === 4 && q.every((w) => p.perWord[S.wordKey(T, w.en)]), 'Luyện tự do: kiểm tra sau khi học dở chỉ hỏi 4 từ đã học, không lẫn từ chưa học', q.map((w) => w.en).join(', '));
+    // Part test result is stored and merged.
+    C.localStorage.clear();
+    const prof = C.Storage.createProfile('QC', '🙂');
+    C.Storage.setActiveProfile(prof.id);
+    C.Progress.finishSession({ mode: 'quiz', topicId: T, chunk: 1, correct: 9, wrong: 1, xp: 10 });
+    const pg = C.Storage.getProgress();
+    const rec = pg.perTopic[T].chunkTests && pg.perTopic[T].chunkTests.c1;
+    check(rec && rec.correct === 9 && rec.total === 10, 'Lưu điểm kiểm tra của phần (9/10) với khoá an toàn cho Firebase ("c1")');
+    parts[1].words.forEach((w) => { pg.perWord[S.wordKey(T, w.en)] = { box: 2, correct: 1, wrong: 0, lastReviewed: Date.now() }; });
+    check(S.chunkStatus(pg, T, parts[1]).state === 'mastered', 'Đạt ≥ 80% → phần "Đạt"');
+    const older = { perWord: {}, perTopic: { [T]: { attempts: 1, chunkTests: { c1: { correct: 3, total: 10, at: 1 }, c2: { correct: 7, total: 10, at: 5 } } } }, history: [] };
+    const m = C.Storage.mergeProgress(pg, C.Storage.normalizeProgress(older));
+    check(m.perTopic[T].chunkTests.c1.correct === 9 && m.perTopic[T].chunkTests.c2.correct === 7, 'Đồng bộ 2 máy giữ điểm phần mới nhất, không mất phần nào');
+  });
 };
