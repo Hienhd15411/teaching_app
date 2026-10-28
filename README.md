@@ -67,6 +67,15 @@ Tab **Lớp học → Học phí** có khối **📅 Google Calendar**: đẩy t
 
 Chạy `TZ=Asia/Ho_Chi_Minh node qc/run.js` (cần `npm i -D playwright && npx playwright install chromium` lần đầu). Phần kiểm tra thủ công với Firebase/email/điện thoại thật: `docs/QC-CHECKLIST.md`. Báo cáo QC gần nhất: `docs/QC-REPORT.md`.
 
+### Skill UX/UI cho Claude Code
+
+Dự án có sẵn 26 skill thiết kế từ [plugin87/ux-ui-agent-skills](https://github.com/plugin87/ux-ui-agent-skills) (v3.0.0, giấy phép MIT — `tools/ux-ui-agent-skills/LICENSE`):
+
+- Skill nằm ở `.claude/skills/` (ví dụ `/design-review`, `/a11y-audit`, `/critique`, `/ux-writing`, `/design-qa`), agent `design-critic` ở `.claude/agents/`. Mở phiên Claude Code mới trong repo là dùng được.
+- Bộ kit mà skill đọc (token, checklist WCAG, script đo tương phản/responsive…) ở `tools/ux-ui-agent-skills/`. Thư viện 2.144 design system không kèm theo; skill tự tải đúng bộ cần dùng và kiểm tra mã băm.
+- 3 hook tự động của plugin **không** được bật: hook kiểm tra emoji sẽ báo lỗi trên mọi lần sửa vì app dùng emoji làm icon, và hook Stop sẽ chặn kết thúc lượt sau mỗi lần sửa `index.html`. Muốn bật, xem `tools/ux-ui-agent-skills/hooks/hooks.json`.
+- Script đo trên trình duyệt cần Playwright: `npm i -D playwright && npx playwright install chromium`.
+
 ## Quy tắc điểm (gamification)
 
 | Hành động              | XP  |

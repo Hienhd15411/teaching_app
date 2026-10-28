@@ -5,3 +5,5 @@ firebase-export*.json
 # QC run output
 qc/last-run.json
 node_modules/
+# ux-ui-agent-skills gate receipts / observability logs
+.ds-receipts/
